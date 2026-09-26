@@ -538,35 +538,49 @@ final class DownloadManager: ObservableObject {
 
         appendLog("\n— \(kind == .metadata ? "解析" : "下载") · \(item.url) —\n")
 
-        stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
+        // FileHandle/Process callbacks are @Sendable on current macOS SDKs.  Keep
+        // immutable strong references here and hop back to MainActor before touching
+        // YTDock state.  Weak capture lists create mutable capture boxes, which Swift
+        // 6 rejects as "reference to captured var ... in concurrently-executing code".
+        let manager = self
+        let processItem = item
+
+        stdout.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             guard !data.isEmpty, let chunk = String(data: data, encoding: .utf8) else { return }
-            Task { @MainActor in self?.consumeOutput(chunk, isError: false) }
+            Task { @MainActor in
+                manager.consumeOutput(chunk, isError: false)
+            }
         }
-        stderr.fileHandleForReading.readabilityHandler = { [weak self] handle in
+        stderr.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             guard !data.isEmpty, let chunk = String(data: data, encoding: .utf8) else { return }
-            Task { @MainActor in self?.consumeOutput(chunk, isError: true) }
+            Task { @MainActor in
+                manager.consumeOutput(chunk, isError: true)
+            }
         }
 
-        proc.terminationHandler = { [weak self, weak item] finished in
+        proc.terminationHandler = { finished in
             stdout.fileHandleForReading.readabilityHandler = nil
             stderr.fileHandleForReading.readabilityHandler = nil
             let outTail = stdout.fileHandleForReading.readDataToEndOfFile()
             let errTail = stderr.fileHandleForReading.readDataToEndOfFile()
             let outText = String(data: outTail, encoding: .utf8) ?? ""
             let errText = String(data: errTail, encoding: .utf8) ?? ""
+            let terminationStatus = finished.terminationStatus
             Task { @MainActor in
-                guard let self, let item else { return }
-                if !outText.isEmpty { self.consumeOutput(outText, isError: false) }
-                if !errText.isEmpty { self.consumeOutput(errText, isError: true) }
-                self.finishProcess(item: item, code: finished.terminationStatus)
+                if !outText.isEmpty { manager.consumeOutput(outText, isError: false) }
+                if !errText.isEmpty { manager.consumeOutput(errText, isError: true) }
+                manager.finishProcess(item: processItem, code: terminationStatus)
             }
         }
 
         do {
             try proc.run()
         } catch {
+            stdout.fileHandleForReading.readabilityHandler = nil
+            stderr.fileHandleForReading.readabilityHandler = nil
+            proc.terminationHandler = nil
             appendLog("启动下载引擎失败：\(error.localizedDescription)\n")
             item.state = .failed
             item.errorMessage = "无法启动内置下载引擎。请重新下载 YTDock。"

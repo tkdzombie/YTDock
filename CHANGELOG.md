@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1 — Swift Concurrency Build Fix
+
+- Fixed Swift 6 concurrency errors in `FileHandle.readabilityHandler` and `Process.terminationHandler`.
+- Process callbacks now capture immutable references and marshal state updates back to `MainActor`.
+- Cleans callback handlers if the downloader process cannot be launched.
+- Keeps the 1.2 native SwiftUI architecture and split arm64/x86_64 release model unchanged.
+
+
 ## 1.2.0 — Native Application Update
 
 ### Product layer
