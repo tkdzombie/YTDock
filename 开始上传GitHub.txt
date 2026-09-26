@@ -1,22 +1,15 @@
-YTDock 1.1 — GitHub 发布说明
+YTDock 1.2 — GitHub 更新与发布
 
-如果你已经有 https://github.com/tkdzombie/YTDock：
+如果你的本地仓库仍在 /Users/lazydog/Downloads/YTDock：
 
-1. 把 1.1.0 的改动更新到你的本地仓库。
-2. 确认 VERSION 是 1.1.0。
-3. git add / commit / push 到 main。
-4. 双击 publish.command，或在 Terminal 执行：
+1. 使用 1.2 UpdateKit 的 update.sh 更新源码。
+2. update.sh 会保留原仓库的 .git 和 GitHub remote。
+3. 确认 VERSION = 1.2.0。
+4. 选择提交并 push main。
+5. 选择发布 v1.2.0。
+6. GitHub Actions 会构建：
+   YTDock-1.2.0-arm64.dmg
+   YTDock-1.2.0-x86_64.dmg
+7. 构建成功后两个 DMG、SHA256SUMS.txt 和 BUILDINFO 会进入同一个 GitHub Release。
 
-   ./publish.command
-
-5. 脚本会创建 v1.1.0 tag。
-6. GitHub Actions 会分别构建：
-
-   YTDock-1.1.0-arm64.dmg
-   YTDock-1.1.0-x86_64.dmg
-
-7. 两个架构都验证成功后，Release 会自动创建/更新。
-
-如果这是一个全新的仓库，才需要运行 setup-github.command。
-
-YTDock 免费发布流程不需要 Apple Developer 会员，也不会把 GitHub Token 写入项目文件。
+注意：免费构建是 ad-hoc 签名，不是 Developer ID 签名，也没有 Apple notarization。

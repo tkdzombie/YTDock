@@ -2,6 +2,8 @@
 
 YTDock aims to stay small, auditable, portable, and macOS-focused.
 
+The main application source is `Sources/YTDockApp.swift`. Keep the product/engine boundary described in `docs/ARCHITECTURE.md`.
+
 Before submitting a change:
 
 1. Do not commit cookies, passwords, tokens, private URLs, downloaded media, or signing keys.

@@ -1,12 +1,12 @@
-YTDock 1.1 — 免费分发版首次打开
+YTDock — 首次打开
 
-1. 下载与你的 Mac 对应的 DMG：Apple Silicon 选 arm64；Intel 选 x86_64。
-2. 把 YTDock.app 从 DMG 拖到“应用程序”。
-3. 双击 YTDock.app。
-4. 因为免费版本没有 Developer ID / Apple notarization，macOS 可能阻止首次启动。
-5. 如果你确认 Release 来源可信并核对过 SHA-256：打开“系统设置” → “隐私与安全性”，在安全性区域选择“仍要打开 / Open Anyway”。
-6. 以后可正常双击启动。
+YTDock 1.2 使用原生 SwiftUI 主程序，并将 yt-dlp、Deno、FFmpeg 一起打包在 App 内。
+不安装 LaunchAgent、daemon、privileged helper 或 YTDock Application Support 数据库。
 
-不要关闭或全局绕过 Gatekeeper。
+安装：
+1. 将 YTDock.app 拖到 Applications（应用程序）。
+2. 由于免费版本没有 Developer ID / Apple notarization，首次打开可能被 Gatekeeper 拦截。
+3. 请使用 macOS 提供的“右键 → 打开”，或在“系统设置 → 隐私与安全性”中允许这一次打开。
 
-卸载：退出 YTDock，把 YTDock.app 移到废纸篓即可。你主动下载的视频/音频不会被删除。
+请不要为了 YTDock 全局关闭 Gatekeeper。
+删除 /Applications/YTDock.app 即可删除 YTDock 及其内置运行组件；你主动下载的媒体文件不会被删除。

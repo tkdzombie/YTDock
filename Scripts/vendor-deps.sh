@@ -43,7 +43,7 @@ fetch "https://github.com/yt-dlp/yt-dlp/releases/download/$YTDLP_VER/yt-dlp_maco
 verify "$TMP/yt-dlp" "$YTDLP_SHA"
 install -m 755 "$TMP/yt-dlp" "$DEST/yt-dlp"
 
-# Architecture-specific Deno: this is one of the main size reductions vs 1.0.
+# Architecture-specific Deno: this is one of the main size reductions introduced after 1.0.
 if [[ "$ARCH" == "arm64" ]]; then
   DENO_ASSET="deno-aarch64-apple-darwin.zip"
   DENO_SHA="$DENO_ARM_SHA"
@@ -63,7 +63,7 @@ mkdir -p "$TMP/deno"
 ditto -x -k "$TMP/$DENO_ASSET" "$TMP/deno"
 install -m 755 "$TMP/deno/deno" "$DEST/deno"
 
-# Architecture-specific FFmpeg. ffprobe is intentionally not bundled because YTDock 1.1 does not invoke it.
+# Architecture-specific FFmpeg. ffprobe is intentionally not bundled because YTDock does not invoke it.
 fetch "https://github.com/eugeneware/ffmpeg-static/releases/download/$FF_TAG/ffmpeg-darwin-$FF_ARCH" "$TMP/ffmpeg"
 verify "$TMP/ffmpeg" "$FF_SHA"
 install -m 755 "$TMP/ffmpeg" "$DEST/ffmpeg"

@@ -1,34 +1,38 @@
 # Changelog
 
+## 1.2.0 — Native Application Update
+
+### Product layer
+
+- Replaced the JXA/osascript application UI with a native SwiftUI macOS application.
+- Added a first-class YTDock queue/state engine for metadata parsing, waiting, download, pause, resume, cancel, retry, completion, and failure states.
+- Added drag-and-drop URL intake directly on the main window.
+- Kept clipboard discovery and multi-URL paste with active-task duplicate protection.
+- Added per-task quality and browser-cookie snapshots so later setting changes do not silently alter existing queued jobs.
+- Added session-only completion notifications with explicit opt-in.
+- Added native Finder reveal and output-folder selection.
+
+### Error experience
+
+- Added YTDock-owned error translation for common cases including login/bot verification, unavailable formats, unsupported URLs, HTTP 403/429, unavailable videos, and missing FFmpeg.
+- Preserved raw engine output in a separate diagnostics sheet with a one-click copy action.
+
+### Architecture and release engineering
+
+- Removed `Sources/app.js` and the native-to-osascript launcher bridge.
+- `Sources/YTDockApp.swift` is now the real CFBundle executable source.
+- Release verification explicitly rejects accidental inclusion of the legacy JXA application layer.
+- Kept architecture-specific Apple Silicon and Intel DMGs introduced in 1.1.
+- Kept yt-dlp, Deno, and FFmpeg pinned and verified before packaging.
+- ffprobe remains intentionally excluded because YTDock does not invoke it.
+
 ## 1.1.0 — Product & Size Update
 
-### Product workflow
-
-- Added active-download pause and resume using process suspension/resumption.
-- The remove action now cancels an active task and removes it cleanly after termination.
-- Added session queue filters: All, Active, Completed, Issues.
-- Added per-task quality and browser-cookie profile snapshots so queued tasks are predictable.
-- Progress details now include reported total size in addition to speed and ETA.
-- Added native completion notifications.
-- Kept queue/history state memory-only so deleting the app remains sufficient for YTDock-owned persistent data.
-
-### Distribution
-
+- Added pause/resume, filters, completion notifications, per-task profiles, duplicate protection, richer progress details, and improved queue behavior.
 - Replaced the 1.0 single universal DMG release with separate `arm64` and `x86_64` DMGs.
-- Deno, FFmpeg, and the native launcher are architecture-specific in each release.
-- Increased DMG zlib compression level.
-- GitHub Actions now builds both architectures independently and publishes both to one Release.
-- Build metadata and checksums are emitted per architecture and combined for the GitHub Release.
-- Changed the bundle identifier to `com.tkdzombie.ytdock` and added explicit project authorship metadata.
-
-### Documentation
-
-- Reframed YTDock as an independent macOS application rather than a generic "yt-dlp GUI".
-- Added architecture/authorship documentation and a copyright notice while keeping third-party attribution explicit.
+- Removed unused ffprobe from release packages.
+- Added architecture/product authorship documentation and separate third-party notices.
 
 ## 1.0.0
 
-- First GitHub-ready public release workflow.
-- Visual queue, thumbnails, progress, retry/cancel, cookies, format presets, portable bundle model.
-- Pinned and verified yt-dlp, Deno and FFmpeg runtime dependencies.
-- Automated free-distribution DMG build and GitHub Release publishing.
+- First GitHub-ready release with automated macOS builds and Releases.

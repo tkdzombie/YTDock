@@ -1,37 +1,28 @@
-# YTDock 1.1 Security Model — free distribution
+# YTDock 1.2 Security Model — free distribution
 
-## Distribution model
+## What the project does
 
-YTDock's free build is a normal macOS application bundle with a native Swift Mach-O launcher. Tagged GitHub Releases publish separate Apple Silicon (`arm64`) and Intel (`x86_64`) DMGs so each user receives only the runtime architecture they need.
+- Compiles a native SwiftUI application from source on the macOS build runner.
+- Pins runtime engine versions and SHA-256 values in `DEPENDENCIES.lock`.
+- Verifies vendored yt-dlp, Deno, and FFmpeg release assets before packaging.
+- Ad-hoc signs nested executables and the app bundle, then verifies the resulting code-signature structure.
+- Keeps Deno's Hardened Runtime JIT exception scoped to the Deno executable rather than the YTDock main executable.
+- Does not install LaunchAgents, daemons, privileged helpers, kernel/system extensions, or a YTDock history database.
+- Does not globally disable Gatekeeper.
+- Keeps the diagnostic log in memory instead of writing a persistent YTDock log database.
 
-The free release path uses **ad-hoc code signing**. This gives executable code a coherent local signature structure, but it is **not** a Developer ID signature and does **not** create Apple trust or a notarization ticket.
+## Bundled runtime software
 
-## No privileged or persistent service installation
-
-YTDock does not install LaunchAgents/LaunchDaemons, login items, privileged helpers, kernel/system extensions, a persistent YTDock Application Support database, telemetry, analytics, or advertising SDKs.
-
-The yt-dlp cache is disabled. Deno cache, thumbnails, and diagnostic logs are directed to system temporary storage. The visible queue is session-only and is not written to disk by YTDock.
-
-## Dependency integrity and minimization
-
-Pinned hashes are recorded in `DEPENDENCIES.lock` for:
+YTDock currently packages:
 
 - yt-dlp 2026.08.19;
-- Deno 2.9.7 for Apple Silicon and Intel;
-- FFmpeg 6.1.1 static binaries for Apple Silicon and Intel.
+- Deno 2.9.7;
+- FFmpeg 6.1.1 static builds from the pinned release source documented in `DEPENDENCIES.lock`.
 
-YTDock 1.1 intentionally no longer bundles ffprobe because the application does not invoke it. Avoiding unused executable dependencies reduces release size and attack surface.
+ffprobe is intentionally not bundled because the application does not invoke it.
 
-Each architecture build downloads only its matching Deno and FFmpeg assets, verifies SHA-256 before packaging, and ad-hoc signs executable code. Deno receives only the `com.apple.security.cs.allow-jit` entitlement required by its V8 JIT runtime.
+## Free distribution limitation
 
-GitHub Actions publishes per-architecture `BUILDINFO` files plus a combined `SHA256SUMS.txt` with each tagged Release.
+Ad-hoc signing is **not** Developer ID signing. The project cannot claim Apple notarization without an eligible Apple Developer Program identity and a successful notarization submission. Gatekeeper can therefore require the normal per-app manual approval flow on first launch.
 
-## Gatekeeper limitation
-
-Without Apple Developer Program membership, this project cannot obtain a Developer ID Application certificate or submit the app for Apple's standard notarization flow. Gatekeeper can therefore show an unidentified-developer / unable-to-check warning on first launch.
-
-Do not disable Gatekeeper globally. If you trust the repository, workflow, source, and exact DMG checksum, use Apple's normal per-app **System Settings > Privacy & Security > Open Anyway** flow after the first blocked launch.
-
-## Secrets
-
-Do not commit browser cookies, GitHub tokens, passwords, `.p12` files, private keys, or downloaded private media. `.gitignore` excludes common signing-secret file types, but contributors should still review commits before pushing.
+Do not disable Gatekeeper globally for YTDock. See `docs/GATEKEEPER.md`.

@@ -1,4 +1,4 @@
-name: Build YTDock macOS DMGs
+name: Build YTDock native macOS DMGs
 
 on:
   workflow_dispatch:
@@ -26,18 +26,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Read version
+      - name: Read and validate version
         id: meta
         shell: bash
         run: |
+          set -euo pipefail
           VERSION="$(tr -d '[:space:]' < VERSION)"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid VERSION=$VERSION" >&2; exit 2; }
+          test -f Sources/YTDockApp.swift
+          test ! -e Sources/app.js
+          test ! -e Sources/NativeLauncher.swift
+          grep -q '__YTDock_VERSION__' Sources/YTDockApp.swift
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
             echo "Tag $GITHUB_REF_NAME does not match VERSION=$VERSION" >&2
             exit 2
           fi
 
-      - name: Build ${{ matrix.arch }} DMG
+      - name: Build ${{ matrix.arch }} native DMG
         shell: zsh {0}
         run: |
           chmod +x Scripts/*.sh *.command
@@ -71,7 +77,7 @@ jobs:
         shell: bash
         run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
 
-      - name: Download both architecture artifacts
+      - name: Download architecture artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: YTDock-${{ steps.meta.outputs.version }}-*
@@ -81,6 +87,7 @@ jobs:
       - name: Create combined checksums
         shell: bash
         run: |
+          set -euo pipefail
           cd release-assets
           cat SHA256SUMS-arm64.txt SHA256SUMS-x86_64.txt > SHA256SUMS.txt
           ls -lah
@@ -99,11 +106,12 @@ jobs:
             "release-assets/BUILDINFO-arm64.txt"
             "release-assets/BUILDINFO-x86_64.txt"
           )
+          BODY="YTDock $VERSION is a native SwiftUI macOS release. Choose arm64 for Apple Silicon or x86_64 for Intel. Free builds are ad-hoc signed and are not Apple notarized. See README, SECURITY.md and the changelog in the repository for details."
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${ASSETS[@]}" --clobber
           else
             gh release create "$GITHUB_REF_NAME" "${ASSETS[@]}" \
               --verify-tag \
               --title "YTDock $VERSION" \
-              --generate-notes
+              --notes "$BODY"
           fi

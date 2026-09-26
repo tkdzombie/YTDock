@@ -1,24 +1,17 @@
-# Publishing with GitHub
+# Publishing YTDock
 
-## Existing YTDock repository
+## Normal release flow
 
-For normal updates:
+1. Update application code and documentation.
+2. Set `VERSION` to the new semantic version (for this release: `1.2.0`).
+3. Commit and push `main`.
+4. Run `./publish.command`.
+5. Confirm creation of the matching tag (`v1.2.0`).
+6. GitHub Actions builds Apple Silicon and Intel DMGs independently.
+7. The release job publishes both DMGs, combined SHA-256 checksums, and per-architecture BUILDINFO files.
 
-1. change and test the source;
-2. update `VERSION` (for this release: `1.1.0`);
-3. update `CHANGELOG.md`;
-4. commit and push `main`;
-5. run `./publish.command`.
+A tag whose version does not match `VERSION` is rejected by the workflow.
 
-`publish.command` creates and pushes the matching `vX.Y.Z` tag. The tag triggers `.github/workflows/build-macos.yml`.
+## Free distribution boundary
 
-YTDock 1.1 builds two release assets independently:
-
-- `YTDock-X.Y.Z-arm64.dmg` for Apple Silicon;
-- `YTDock-X.Y.Z-x86_64.dmg` for Intel Macs.
-
-The workflow verifies each app bundle/DMG, uploads temporary Actions artifacts, then a release job combines their checksums and publishes both DMGs plus `BUILDINFO-arm64.txt`, `BUILDINFO-x86_64.txt`, and `SHA256SUMS.txt` to the GitHub Release.
-
-## First publication of a new repository
-
-`setup-github.command` remains available for a fresh repository. It uses GitHub CLI browser authentication, initializes Git, creates the repository, pushes `main`, pushes the version tag, watches Actions, and prints the Release URL. No GitHub token is written into the repository.
+The automated build uses ad-hoc code signing for bundle integrity only. It does not produce Developer ID trust or Apple notarization. No Apple credential, signing key, GitHub Personal Access Token, or app-specific password is stored in this repository.

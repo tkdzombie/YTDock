@@ -1,14 +1,16 @@
-# YTDock 1.1 Privacy
+# YTDock 1.2 Privacy
 
-YTDock is designed to keep its own persistent footprint minimal.
+YTDock is designed as a local macOS download manager.
 
-- No account system, telemetry, analytics, advertising SDK, crash-upload service, or tracking identifier is included.
-- The download queue and entered URLs are session-only and are not written to a YTDock history database.
-- yt-dlp cache is disabled with `--no-cache-dir`.
-- Deno runtime cache is redirected to a per-process system temporary directory and removed when YTDock exits normally.
-- Temporary thumbnails and diagnostic logs are stored in the system temporary directory and removed on normal exit.
-- Browser cookies are read only when the user explicitly selects a browser in the UI. YTDock does not copy them into its own persistent store.
-- Downloaded media is saved to the folder selected by the user and is intentionally not deleted when YTDock is removed.
-- No LaunchAgent, daemon, privileged helper, kernel/system extension, login item, or YTDock Application Support directory is installed.
+- YTDock does not include analytics or advertising SDKs.
+- YTDock does not create its own user account system.
+- YTDock does not maintain a persistent YTDock download-history database.
+- The task queue, diagnostics, clipboard discovery state, and completion-notification toggle are session-only.
+- Temporary runtime cache is stored under the system temporary directory for the running session.
+- Downloaded media is written to the folder explicitly selected by the user.
+- Browser cookies are requested from yt-dlp only when the user chooses Safari, Chrome, or Firefox for a task. Selecting “不使用” does not request browser cookies.
+- YTDock itself does not transmit telemetry to a YTDock server because no YTDock telemetry service exists.
 
-Deleting `YTDock.app` removes the application and its bundled runtime engines. macOS itself may retain normal operating-system metadata such as recent-item or Gatekeeper exception records.
+Network requests are still made to the URLs/services required to resolve and download user-requested media, and bundled third-party tools perform those requests as part of their normal function.
+
+Removing `YTDock.app` removes YTDock and its bundled runtime tools. Downloaded media is user data and is not deleted automatically.
