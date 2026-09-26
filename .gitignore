@@ -1,0 +1,29 @@
+# macOS / Finder
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Build output
+build/
+dist/
+*.dmg
+*.zip
+*.tar.gz
+
+# Local-only files
+.env
+.env.*
+!.env.example
+*.p12
+*.cer
+*.mobileprovision
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Temporary
+*.tmp
+*.log
+__pycache__/

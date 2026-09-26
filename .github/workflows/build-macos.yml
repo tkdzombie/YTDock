@@ -1,0 +1,77 @@
+name: Build YTDock macOS DMG
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ytdock-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: meta
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match VERSION=$VERSION" >&2
+            exit 2
+          fi
+
+      - name: Build free-distribution DMG
+        shell: zsh {0}
+        run: |
+          chmod +x Scripts/*.sh *.command
+          ./Scripts/build-macos.sh
+
+      - name: Verify release
+        shell: zsh {0}
+        run: ./Scripts/verify-release.sh
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YTDock-${{ steps.meta.outputs.version }}-macOS-free
+          path: |
+            build/free/YTDock-${{ steps.meta.outputs.version }}.dmg
+            build/free/SHA256SUMS.txt
+            build/free/BUILDINFO.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release for tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          ASSETS=(
+            "build/free/YTDock-$VERSION.dmg"
+            "build/free/SHA256SUMS.txt"
+            "build/free/BUILDINFO.txt"
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${ASSETS[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${ASSETS[@]}" \
+              --verify-tag \
+              --title "YTDock $VERSION" \
+              --generate-notes
+          fi

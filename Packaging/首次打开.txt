@@ -1,0 +1,11 @@
+YTDock 1.0 — 免费分发版首次打开
+
+1. 把 YTDock.app 从 DMG 复制到“应用程序”。不要直接在只读 DMG 里运行首次配置。
+2. 双击 YTDock.app。
+3. 因为此免费版本没有 Developer ID / Apple notarization，macOS 可能阻止首次启动。
+4. 如果你确认 DMG 来源可信并核对过 SHA-256：打开“系统设置” → “隐私与安全性”，在安全性区域选择“仍要打开 / Open Anyway”。
+5. 以后可正常双击启动。
+
+不要关闭或全局绕过 Gatekeeper。
+
+卸载：退出 YTDock，把 YTDock.app 移到废纸篓即可。你主动下载的视频/音频不会被删除。

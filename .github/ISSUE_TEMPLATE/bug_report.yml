@@ -1,0 +1,45 @@
+name: Bug report
+description: Report a reproducible YTDock problem
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not include browser cookies, passwords, private URLs, or other secrets.
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "e.g. macOS 15.6"
+    validations:
+      required: true
+  - type: dropdown
+    id: cpu
+    attributes:
+      label: Mac architecture
+      options:
+        - Apple Silicon
+        - Intel
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open YTDock\n2. Paste ...\n3. Click ..."
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant diagnostic log
+      description: Remove URLs/cookies/private information before pasting.
+      render: shell

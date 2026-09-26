@@ -1,0 +1,35 @@
+YTDock 1.0 — GitHub 一键发布
+================================
+
+推荐位置：
+/Users/lazydog/Downloads/YTDock-1.0.0
+
+第一次创建仓库 + 发布 v1.0.0：
+
+1. 解压整个 YTDock-1.0.0 文件夹到“下载”。
+2. 双击：setup-github.command
+3. 如果没有 GitHub CLI：
+   - 有 Homebrew 时，脚本会询问是否执行 brew install gh；
+   - 没有 Homebrew 时，先安装 GitHub CLI，然后重新双击脚本。
+4. 第一次使用 gh 时浏览器会打开 GitHub 登录页面。
+5. 输入仓库名（直接回车默认 YTDock）。
+6. 输入 public 或 private（直接回车默认 public）。
+7. 脚本会自动：
+   Git init → commit → 创建 GitHub repo → push main → tag v1.0.0 →
+   GitHub Actions macOS 构建 → DMG → SHA256 → GitHub Release。
+
+终端方式：
+cd /Users/lazydog/Downloads/YTDock-1.0.0
+./setup-github.command
+
+以后发布新版：
+
+1. 修改 VERSION，例如 1.0.1。
+2. 修改代码与 CHANGELOG.md。
+3. commit 并 push 到 main。
+4. 双击 publish.command。
+
+注意：
+- 项目不会保存 GitHub 密码或 Token。
+- 免费版本仍然不是 Developer ID 签名/Apple notarized。
+- 不要上传 Cookies、密码、.p12、私钥或私有下载内容。
