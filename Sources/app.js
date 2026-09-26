@@ -4,13 +4,14 @@ var APP = Application.currentApplication()
 APP.includeStandardAdditions = true
 
 var state = {
-  resourceDir:'', binDir:'', ytdlp:'', deno:'', denoZip:'', ffmpeg:'', ffprobe:'', arch:'', outputDir:'',
+  resourceDir:'', binDir:'', ytdlp:'', deno:'', denoZip:'', ffmpeg:'', arch:'', outputDir:'',
   task:null, mode:'idle', activeJobId:0, timer:null, pendingBootstrap:false,
   logPath:'', logOffset:0, logText:'', logWindow:null, logView:null,
   urlField:null, quality:null, cookies:null, statusLabel:null, topHint:null, pathLabel:null,
   queueDoc:null, queueScroll:null, queueCountLabel:null, queueHintLabel:null,
   downloadAllBtn:null, clearBtn:null, jobs:[], nextId:1, thumbSerial:1,
   lastPasteboardChange:-1, clipboardURL:'', pasteBtn:null, filterControl:null, filter:'all',
+  sessionCompleted:0, sessionFailed:0,
   aboutWindow:null, denoCacheDir:''
 }
 
@@ -21,8 +22,7 @@ var BUILD = {
   denoVersion:'2.9.7',
   denoSha256:{arm64:'5cd46d6268f6f78f5d88bdc7159d20bd44cdaa4b3303474839f87ec6fe7ae25c',x86_64:'95daaff11c116a52ad54785e7914c8e9c9cdcaba793c5ed929c74ca2d8e6259a'},
   ffmpegVersion:'6.1.1',
-  ffmpegSha256:{arm64:'a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584',x86_64:'ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894'},
-  ffprobeSha256:{arm64:'bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64',x86_64:'fa3add0ce901f7241abe0dfc0155d958fc834aca3f8ce61f87cc712ae669c1e0'}
+  ffmpegSha256:{arm64:'a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584',x86_64:'ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894'}
 }
 
 function js(v){ try{return ObjC.unwrap(v)}catch(e){return String(v)} }
@@ -107,10 +107,14 @@ function readLogDelta(){
 }
 function bundleWritable(){ try{return Boolean(fm().isWritableFileAtPath(ns(state.resourceDir)))}catch(e){return false} }
 function chmod755(p){ var t=$.NSTask.alloc.init;t.launchPath='/bin/chmod';t.arguments=$(['755',p]);t.launch;t.waitUntilExit }
-function toolsReady(){ return exists(state.ytdlp)&&exists(state.deno)&&exists(state.ffmpeg)&&exists(state.ffprobe) }
+function toolsReady(){ return exists(state.ytdlp)&&exists(state.deno)&&exists(state.ffmpeg) }
 
-function qualityFormat(){
-  var i=Number(state.quality.indexOfSelectedItem)
+function qualityFormat(){ return qualityFormatAt(qualityIndex()) }
+function qualityIndex(){ try{return Number(state.quality.indexOfSelectedItem)}catch(e){return 0} }
+function qualityNameAt(i){ var names=['最佳 MP4','最高 4K','最高 1080p','最高 720p','仅音频'];return names[Number(i)]||names[0] }
+function qualityName(){ return qualityNameAt(qualityIndex()) }
+function qualityFormatAt(i){
+  i=Number(i)
   if(i===0)return 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
   if(i===1)return 'bestvideo[height<=2160]+bestaudio/best[height<=2160]/best'
   if(i===2)return 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best'
@@ -118,8 +122,10 @@ function qualityFormat(){
   if(i===4)return 'bestaudio[ext=m4a]/bestaudio'
   return 'bestvideo+bestaudio/best'
 }
-function qualityName(){ try{return js(state.quality.titleOfSelectedItem)}catch(e){return '最佳质量'} }
-function cookieArgs(){ var i=Number(state.cookies.indexOfSelectedItem);if(i===1)return['--cookies-from-browser','safari'];if(i===2)return['--cookies-from-browser','chrome'];if(i===3)return['--cookies-from-browser','firefox'];return[] }
+function cookieIndex(){ try{return Number(state.cookies.indexOfSelectedItem)}catch(e){return 0} }
+function cookieArgsAt(i){i=Number(i);if(i===1)return['--cookies-from-browser','safari'];if(i===2)return['--cookies-from-browser','chrome'];if(i===3)return['--cookies-from-browser','firefox'];return[] }
+function cookieArgs(){ return cookieArgsAt(cookieIndex()) }
+function snapshotProfile(job){ job.formatIndex=qualityIndex();job.formatName=qualityNameAt(job.formatIndex);job.cookieIndex=cookieIndex() }
 function humanDuration(v){ if(!v)return'';if(typeof v==='string')return v;var n=Math.floor(Number(v)||0),h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;return h?(h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')):(m+':'+String(s).padStart(2,'0')) }
 function cleanURL(s){ return trim(String(s||'').replace(/[\]\[(){}<>"'，。；、]+$/g,'')) }
 function parseLinks(text){
@@ -132,15 +138,16 @@ function jobById(id){ for(var i=0;i<state.jobs.length;i++)if(state.jobs[i].id===
 function activeJob(){ return jobById(state.activeJobId) }
 function jobStatusText(job){
   if(job.status==='queued')return'等待解析';if(job.status==='parsing')return'解析中';if(job.status==='thumb')return'读取封面';if(job.status==='ready')return'可下载';
-  if(job.status==='waiting')return'等待下载';if(job.status==='downloading')return'下载中';if(job.status==='done')return'已完成';if(job.status==='error')return'失败';if(job.status==='cancelled')return'已取消';return'等待'
+  if(job.status==='waiting')return'等待下载';if(job.status==='downloading')return'下载中';if(job.status==='paused')return'已暂停';if(job.status==='done')return'已完成';if(job.status==='error')return'失败';if(job.status==='cancelled')return'已取消';return'等待'
 }
 function jobStatusColor(job){
-  try{if(job.status==='done')return $.NSColor.systemGreenColor;if(job.status==='error')return $.NSColor.systemRedColor;if(job.status==='downloading'||job.status==='parsing'||job.status==='thumb')return $.NSColor.controlAccentColor;if(job.status==='waiting')return $.NSColor.systemOrangeColor}catch(e){}
+  try{if(job.status==='done')return $.NSColor.systemGreenColor;if(job.status==='error')return $.NSColor.systemRedColor;if(job.status==='downloading'||job.status==='parsing'||job.status==='thumb')return $.NSColor.controlAccentColor;if(job.status==='paused'||job.status==='waiting')return $.NSColor.systemOrangeColor}catch(e){}
   return $.NSColor.secondaryLabelColor
 }
-function jobSymbol(job){ if(job.status==='done')return'checkmark.circle.fill';if(job.status==='error')return'exclamationmark.triangle.fill';if(job.status==='downloading')return'arrow.down.circle.fill';if(job.status==='parsing'||job.status==='thumb')return'sparkles';if(job.status==='waiting')return'clock.fill';return'play.rectangle.fill' }
+function jobSymbol(job){ if(job.status==='done')return'checkmark.circle.fill';if(job.status==='error')return'exclamationmark.triangle.fill';if(job.status==='paused')return'pause.circle.fill';if(job.status==='downloading')return'arrow.down.circle.fill';if(job.status==='parsing'||job.status==='thumb')return'sparkles';if(job.status==='waiting')return'clock.fill';return'play.rectangle.fill' }
 function jobDetail(job){
-  if(job.status==='downloading')return (job.speed||'—')+(job.eta?'  ·  剩余 '+job.eta:'')
+  if(job.status==='downloading')return (job.speed||'—')+(job.totalSize?'  ·  '+job.totalSize:'')+(job.eta?'  ·  剩余 '+job.eta:'')
+  if(job.status==='paused')return '已暂停  ·  '+(job.formatName||qualityNameAt(job.formatIndex||0))
   if(job.status==='done')return job.finalPath?'已保存 · '+state.outputDir:'已保存到 '+state.outputDir
   if(job.status==='error')return job.error||'打开详情查看原因'
   if(job.status==='cancelled')return'任务已取消，可重新下载'
@@ -153,9 +160,15 @@ function jobDetail(job){
 }
 function countSummary(){
   var active=0,done=0,errors=0
-  for(var i=0;i<state.jobs.length;i++){var s=state.jobs[i].status;if(s==='downloading'||s==='parsing'||s==='thumb'||s==='waiting'||s==='queued')active++;if(s==='done')done++;if(s==='error')errors++}
+  for(var i=0;i<state.jobs.length;i++){var s=state.jobs[i].status;if(s==='downloading'||s==='paused'||s==='parsing'||s==='thumb'||s==='waiting'||s==='queued')active++;if(s==='done')done++;if(s==='error')errors++}
   if(!state.jobs.length)return'暂无任务'
   var bits=[state.jobs.length+' 个任务'];if(active)bits.push(active+' 个进行/等待');if(done)bits.push(done+' 个完成');if(errors)bits.push(errors+' 个失败');return bits.join('  ·  ')
+}
+function jobMatchesFilter(job){
+  if(state.filter==='active')return ['queued','parsing','thumb','ready','waiting','downloading','paused'].indexOf(job.status)>=0
+  if(state.filter==='done')return job.status==='done'
+  if(state.filter==='issues')return ['error','cancelled'].indexOf(job.status)>=0
+  return true
 }
 function updateHeader(){
   if(state.queueCountLabel)state.queueCountLabel.stringValue=ns(countSummary())
@@ -167,39 +180,42 @@ function updateJobUI(job){
   try{
     if(job.uiTitle)job.uiTitle.stringValue=ns(job.title||'等待解析链接')
     if(job.uiMeta)job.uiMeta.stringValue=ns(job.meta||job.url)
-    if(job.uiProgress){job.uiProgress.doubleValue=job.progress||0;job.uiProgress.hidden=!(job.status==='downloading'||job.status==='done'||job.status==='waiting')}
-    if(job.uiPct){job.uiPct.stringValue=ns(job.status==='done'?'完成':((job.status==='downloading'||job.status==='waiting')?((job.progress||0).toFixed(job.progress>=10?0:1)+'%'):' '))}
+    if(job.uiProgress){job.uiProgress.doubleValue=job.progress||0;job.uiProgress.hidden=!(job.status==='downloading'||job.status==='paused'||job.status==='done'||job.status==='waiting')}
+    if(job.uiPct){job.uiPct.stringValue=ns(job.status==='done'?'完成':((job.status==='downloading'||job.status==='paused'||job.status==='waiting')?((job.progress||0).toFixed(job.progress>=10?0:1)+'%'):' '))}
     if(job.uiDetail)job.uiDetail.stringValue=ns(jobDetail(job))
     if(job.uiChip){job.uiChip.stringValue=ns(jobStatusText(job));job.uiChip.textColor=jobStatusColor(job);job.uiChip.layer.backgroundColor=colorAlpha(jobStatusColor(job),0.10).CGColor}
     if(job.uiThumb && job.image){job.uiThumb.image=job.image;job.uiThumb.imageScaling=$.NSImageScaleAxesIndependently}
     if(job.uiAction){
       if(job.status==='done'){job.uiAction.title=$('Finder');job.uiAction.enabled=true}
-      else if(job.status==='downloading'||job.status==='parsing'||job.status==='thumb'){job.uiAction.title=$('取消');job.uiAction.enabled=true}
+      else if(job.status==='downloading'){job.uiAction.title=$('暂停');job.uiAction.enabled=true}
+      else if(job.status==='paused'){job.uiAction.title=$('继续');job.uiAction.enabled=true}
+      else if(job.status==='parsing'||job.status==='thumb'){job.uiAction.title=$('取消');job.uiAction.enabled=true}
       else if(job.status==='queued'){job.uiAction.title=$('等待');job.uiAction.enabled=false}
       else if(job.status==='waiting'){job.uiAction.title=$('取消等待');job.uiAction.enabled=true}
       else{job.uiAction.title=ns(job.status==='error'||job.status==='cancelled'?'重试':'下载');job.uiAction.enabled=true}
     }
-    if(job.uiRemove)job.uiRemove.enabled=!(state.activeJobId===job.id && state.task && state.task.running)
+    if(job.uiRemove)job.uiRemove.enabled=true
   }catch(e){}
   updateHeader()
 }
 function renderQueue(actions){
   if(!state.queueDoc)return
   removeSubviews(state.queueDoc)
-  var W=824,cardH=112,gap=12
-  if(!state.jobs.length){
+  var W=824,cardH=112,gap=12,visible=[]
+  for(var vi=0;vi<state.jobs.length;vi++)if(jobMatchesFilter(state.jobs[vi]))visible.push(state.jobs[vi])
+  if(!visible.length){
     var h=326;state.queueDoc.frame=$.NSMakeRect(0,0,W,h)
     var empty=card(0,20,W,286,20);state.queueDoc.addSubview(empty)
     var ic=$.NSImageView.alloc.initWithFrame($.NSMakeRect(354,161,116,72));ic.image=symbol('square.stack.3d.up.slash',46,$.NSFontWeightLight);ic.imageScaling=$.NSImageScaleProportionallyDown;empty.addSubview(ic)
-    var t=label('队列是空的',0,126,W,28,18,$.NSFontWeightSemibold,$.NSColor.labelColor);t.alignment=$.NSTextAlignmentCenter;empty.addSubview(t)
+    var t=label(state.jobs.length?'当前筛选没有任务':'队列是空的',0,126,W,28,18,$.NSFontWeightSemibold,$.NSColor.labelColor);t.alignment=$.NSTextAlignmentCenter;empty.addSubview(t)
     var s=label('粘贴一个或多个链接。YTDock 会先解析，再按你的选择下载。',100,94,W-200,24,12,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor);s.alignment=$.NSTextAlignmentCenter;empty.addSubview(s)
     var tip=label('支持一次粘贴多行链接；也可将文本 URL 拖入上方输入框。',100,66,W-200,22,11,$.NSFontWeightRegular,$.NSColor.tertiaryLabelColor);tip.alignment=$.NSTextAlignmentCenter;empty.addSubview(tip)
     updateHeader();return
   }
-  var total=state.jobs.length*(cardH+gap)+10;var minH=326;if(total<minH)total=minH;state.queueDoc.frame=$.NSMakeRect(0,0,W,total)
+  var total=visible.length*(cardH+gap)+10;var minH=326;if(total<minH)total=minH;state.queueDoc.frame=$.NSMakeRect(0,0,W,total)
   var y=total-cardH-4
-  for(var i=0;i<state.jobs.length;i++){
-    var job=state.jobs[i],b=card(0,y,W,cardH,18);state.queueDoc.addSubview(b)
+  for(var i=0;i<visible.length;i++){
+    var job=visible[i],b=card(0,y,W,cardH,18);state.queueDoc.addSubview(b)
     var thumb=card(12,12,138,88,12);try{thumb.fillColor=$.NSColor.blackColor}catch(e){};b.addSubview(thumb)
     var iv=$.NSImageView.alloc.initWithFrame($.NSMakeRect(0,0,138,88));iv.image=job.image||symbol(jobSymbol(job),38,$.NSFontWeightRegular);iv.imageScaling=job.image?$.NSImageScaleAxesIndependently:$.NSImageScaleProportionallyDown;thumb.addSubview(iv);job.uiThumb=iv
     job.uiTitle=label(job.title||'等待解析链接',168,75,444,24,14,$.NSFontWeightSemibold,$.NSColor.labelColor);b.addSubview(job.uiTitle)
@@ -217,9 +233,9 @@ function renderQueue(actions){
 function parseTaskOutput(text){
   var job=activeJob();if(!job)return
   if(state.mode==='download'){
-    var re=/YTDPROGRESS:\s*([0-9.]+)%\|([^|\r\n]*)\|([^\r\n]*)/g,m,last=null
+    var re=/YTDPROGRESS:\s*([0-9.]+)%\|([^|\r\n]*)\|([^|\r\n]*)\|([^\r\n]*)/g,m,last=null
     while((m=re.exec(text))!==null)last=m
-    if(last){job.progress=Math.max(0,Math.min(100,parseFloat(last[1])||0));job.speed=trim(last[2]);job.eta=trim(last[3]);updateJobUI(job)}
+    if(last){job.progress=Math.max(0,Math.min(100,parseFloat(last[1])||0));job.speed=trim(last[2]);job.eta=trim(last[3]);job.totalSize=trim(last[4]);updateJobUI(job)}
     var out=/YTDOUTPUT:([^\r\n]+)/g,om,ol=null;while((om=out.exec(text))!==null)ol=om;if(ol)job.finalPath=trim(ol[1])
   }
 }
@@ -229,7 +245,7 @@ function addJobs(text,actions,autoDownload){
   for(var i=0;i<links.length;i++){
     var duplicate=false;for(var j=0;j<state.jobs.length;j++)if(state.jobs[j].url===links[i]&&state.jobs[j].status!=='error'&&state.jobs[j].status!=='cancelled'){duplicate=true;break}
     if(duplicate)continue
-    state.jobs.push({id:state.nextId++,url:links[i],title:'等待解析链接',meta:links[i],status:'queued',progress:0,speed:'',eta:'',error:'',thumbnail:'',thumbPath:'',image:null,autoDownload:!!autoDownload,finalPath:''});added++
+    var nj={id:state.nextId++,url:links[i],title:'等待解析链接',meta:links[i],status:'queued',progress:0,speed:'',eta:'',totalSize:'',error:'',thumbnail:'',thumbPath:'',image:null,autoDownload:!!autoDownload,finalPath:'',removeAfterFinish:false};snapshotProfile(nj);state.jobs.push(nj);added++
   }
   if(added){state.urlField.stringValue=$('');renderQueue(actions);setStatus('已加入队列');setHint(added+' 个链接已加入');processQueue(actions)}
   else{setStatus('链接已在队列中');setHint('不会重复添加同一个活动任务')}
@@ -258,23 +274,16 @@ function startDenoBootstrap(actions){
   setStatus('初始化 JavaScript runtime…')
 }
 function startFFmpegBootstrap(actions){
-  if(exists(state.ffmpeg)){startFFprobeBootstrap(actions);return}
+  if(exists(state.ffmpeg)){state.pendingBootstrap=false;setStatus('就绪');processQueue(actions);return}
   state.logPath=makeLogPath('bootstrap-ffmpeg');state.logOffset=0;appendLog('\n— 初始化 FFmpeg —\n');state.mode='bootstrap-ffmpeg';state.activeJobId=0
   var a=state.arch==='arm64'?'arm64':'x64'
   state.task=shellTask('/usr/bin/curl',['-L','--fail','--retry','2','--connect-timeout','15','-o',state.ffmpeg,'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-'+a],state.logPath)
   setStatus('初始化媒体合并引擎…');setHint('首次运行会校验 FFmpeg 完整性')
 }
-function startFFprobeBootstrap(actions){
-  if(exists(state.ffprobe)){state.pendingBootstrap=false;setStatus('就绪');processQueue(actions);return}
-  state.logPath=makeLogPath('bootstrap-ffprobe');state.logOffset=0;appendLog('\n— 初始化 FFprobe —\n');state.mode='bootstrap-ffprobe';state.activeJobId=0
-  var a=state.arch==='arm64'?'arm64':'x64'
-  state.task=shellTask('/usr/bin/curl',['-L','--fail','--retry','2','--connect-timeout','15','-o',state.ffprobe,'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-'+a],state.logPath)
-  setStatus('初始化媒体探测引擎…')
-}
 function startMetadataJob(job){
   job.status='parsing';job.error='';job.progress=0;state.activeJobId=job.id;updateJobUI(job)
   state.logPath=makeLogPath('meta-'+job.id);state.logOffset=0;appendLog('\n— 解析任务 #'+job.id+' —\n'+job.url+'\n');state.mode='metadata'
-  var args=['--ignore-config','--no-cache-dir','--quiet','--no-warnings','--skip-download','--dump-single-json','--no-playlist','--js-runtimes','deno:'+state.deno].concat(cookieArgs()).concat([job.url])
+  var args=['--ignore-config','--no-cache-dir','--quiet','--no-warnings','--skip-download','--dump-single-json','--no-playlist','--js-runtimes','deno:'+state.deno].concat(cookieArgsAt(job.cookieIndex)).concat([job.url])
   state.task=shellTask(state.ytdlp,args,state.logPath);setStatus('解析中');setHint(job.title==='等待解析链接'?'正在读取链接信息':job.title)
 }
 function applyMetadata(job,o,actions){
@@ -292,10 +301,19 @@ function loadThumbnail(job){ try{if(exists(job.thumbPath)){var img=$.NSImage.all
 function startDownloadJob(job){
   job.status='downloading';job.progress=0;job.speed='';job.eta='';job.error='';state.activeJobId=job.id;updateJobUI(job)
   state.logPath=makeLogPath('download-'+job.id);state.logOffset=0;appendLog('\n— 下载任务 #'+job.id+' —\n'+job.url+'\n');state.mode='download'
-  var args=['--ignore-config','--no-cache-dir','--newline','--no-colors','--no-playlist','--trim-filenames','180','--paths',state.outputDir,'--output','%(title)s [%(id)s].%(ext)s','--format',qualityFormat(),
-    '--ffmpeg-location',state.ffmpeg,'--progress-template','download:YTDPROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s','--print','after_move:YTDOUTPUT:%(filepath)s','--js-runtimes','deno:'+state.deno]
-    .concat(cookieArgs()).concat([job.url])
+  var args=['--ignore-config','--no-cache-dir','--newline','--no-colors','--no-playlist','--trim-filenames','180','--paths',state.outputDir,'--output','%(title)s [%(id)s].%(ext)s','--format',qualityFormatAt(job.formatIndex),
+    '--ffmpeg-location',state.ffmpeg,'--progress-template','download:YTDPROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress._total_bytes_str)s','--print','after_move:YTDOUTPUT:%(filepath)s','--js-runtimes','deno:'+state.deno]
+    .concat(cookieArgsAt(job.cookieIndex)).concat([job.url])
   state.task=shellTask(state.ytdlp,args,state.logPath);setStatus('下载中');setHint(job.title)
+}
+function signalActive(sig){
+  try{if(!state.task||!state.task.running)return false;var pid=Number(state.task.processIdentifier);if(!pid)return false;APP.doShellScript('/bin/kill -'+String(sig)+' '+String(pid));return true}catch(e){appendLog('任务信号失败：'+e+'\n');return false}
+}
+function removeJobNow(id){
+  var out=[];for(var i=0;i<state.jobs.length;i++){if(state.jobs[i].id===Number(id)){removeFile(state.jobs[i].thumbPath)}else out.push(state.jobs[i])}state.jobs=out
+}
+function notifyCompleted(job){
+  try{APP.displayNotification(job.title||'下载完成',{withTitle:'YTDock',subtitle:'下载完成'})}catch(e){}
 }
 function processQueue(actions){
   if(state.task&&state.task.running)return
@@ -324,30 +342,26 @@ function finishTask(code,actions){
     removeFile(state.denoZip);removeFile(state.deno);state.pendingBootstrap=false;setStatus('完整性验证失败');setHint('已拒绝使用下载到的 runtime；打开详情查看原因');return
   }
   if(mode==='bootstrap-ffmpeg'){
-    if(code===0&&exists(state.ffmpeg)&&verifyHash(state.ffmpeg,BUILD.ffmpegSha256[state.arch]||'', 'FFmpeg '+state.arch)){chmod755(state.ffmpeg);appendLog('✓ FFmpeg '+BUILD.ffmpegVersion+' 就绪\n');startFFprobeBootstrap(actions);return}
+    if(code===0&&exists(state.ffmpeg)&&verifyHash(state.ffmpeg,BUILD.ffmpegSha256[state.arch]||'', 'FFmpeg '+state.arch)){chmod755(state.ffmpeg);appendLog('✓ FFmpeg '+BUILD.ffmpegVersion+' 就绪\n');state.pendingBootstrap=false;setStatus('就绪');processQueue(actions);return}
     removeFile(state.ffmpeg);state.pendingBootstrap=false;setStatus('完整性验证失败');setHint('已拒绝使用下载到的 FFmpeg；打开详情查看原因');return
-  }
-  if(mode==='bootstrap-ffprobe'){
-    if(code===0&&exists(state.ffprobe)&&verifyHash(state.ffprobe,BUILD.ffprobeSha256[state.arch]||'', 'FFprobe '+state.arch)){chmod755(state.ffprobe);appendLog('✓ FFprobe '+BUILD.ffmpegVersion+' 就绪\n');state.pendingBootstrap=false;setStatus('就绪');processQueue(actions);return}
-    removeFile(state.ffprobe);state.pendingBootstrap=false;setStatus('完整性验证失败');setHint('已拒绝使用下载到的 FFprobe；打开详情查看原因');return
   }
   if(!job){processQueue(actions);return}
   if(mode==='metadata'){
-    if(job.status==='cancelled'){updateJobUI(job);processQueue(actions);return}
+    if(job.status==='cancelled'){if(job.removeAfterFinish){removeJobNow(job.id);renderQueue(actions)}else updateJobUI(job);processQueue(actions);return}
     if(code===0){
       try{var raw=js($.NSString.stringWithContentsOfFileEncodingError(ns(state.logPath),$.NSUTF8StringEncoding,null)),start=raw.indexOf('{'),end=raw.lastIndexOf('}');if(start>=0&&end>start){applyMetadata(job,JSON.parse(raw.slice(start,end+1)),actions);return}}catch(e){appendLog('解析 JSON 失败：'+e+'\n')}
     }
     job.status='error';job.error='无法解析链接；可尝试切换 Cookies';updateJobUI(job);processQueue(actions);return
   }
   if(mode==='thumbnail'){
-    if(job.status==='cancelled'){removeFile(job.thumbPath);job.thumbPath='';updateJobUI(job);processQueue(actions);return}
+    if(job.status==='cancelled'){removeFile(job.thumbPath);job.thumbPath='';if(job.removeAfterFinish){removeJobNow(job.id);renderQueue(actions)}else updateJobUI(job);processQueue(actions);return}
     loadThumbnail(job);job.status=job.autoDownload?'waiting':'ready';updateJobUI(job);processQueue(actions);return
   }
   if(mode==='download'){
-    if(code===0){job.status='done';job.progress=100;job.error='';appendLog('✓ 下载完成\n')}
+    if(code===0){job.status='done';job.progress=100;job.error='';state.sessionCompleted++;appendLog('✓ 下载完成\n');notifyCompleted(job)}
     else if(job.status==='cancelled'){appendLog('— 已取消 —\n')}
-    else{job.status='error';job.error='下载失败，打开详情查看原因';appendLog('✗ 下载失败，错误码：'+code+'\n')}
-    updateJobUI(job);processQueue(actions);return
+    else{job.status='error';job.error='下载失败，打开详情查看原因';state.sessionFailed++;appendLog('✗ 下载失败，错误码：'+code+'\n')}
+    if(job.removeAfterFinish){var rid=job.id;removeJobNow(rid);renderQueue(actions)}else updateJobUI(job);processQueue(actions);return
   }
   processQueue(actions)
 }
@@ -357,12 +371,12 @@ function openAboutWindow(){
   w.title=$('关于 YTDock');w.center;var c=w.contentView
   var iv=$.NSImageView.alloc.initWithFrame($.NSMakeRect(206,326,108,62));iv.image=symbol('arrow.down.circle.fill',54,$.NSFontWeightRegular);iv.imageScaling=$.NSImageScaleProportionallyDown;c.addSubview(iv)
   var name=label('YTDock',0,292,520,32,24,$.NSFontWeightBold,$.NSColor.labelColor);name.alignment=$.NSTextAlignmentCenter;c.addSubview(name)
-  var ver=label('Version '+BUILD.version+'  ·  免费分发构建',0,265,520,22,12,$.NSFontWeightMedium,$.NSColor.secondaryLabelColor);ver.alignment=$.NSTextAlignmentCenter;c.addSubview(ver)
+  var ver=label('Version '+BUILD.version+'  ·  '+state.arch+'  ·  独立 macOS 下载管理器',0,265,520,22,12,$.NSFontWeightMedium,$.NSColor.secondaryLabelColor);ver.alignment=$.NSTextAlignmentCenter;c.addSubview(ver)
   var box=card(32,98,456,146,16);c.addSubview(box)
   box.addSubview(label('隐私与安全',18,108,180,22,13,$.NSFontWeightSemibold,$.NSColor.labelColor))
-  box.addSubview(label('• 不保存下载历史或链接数据库',18,82,410,20,11,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor))
+  box.addSubview(label('• 会话队列、筛选、暂停/继续均由 YTDock 管理',18,82,410,20,11,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor))
   box.addSubview(label('• 不安装后台服务、LaunchAgent 或特权辅助程序',18,58,410,20,11,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor))
-  box.addSubview(label('• yt-dlp / Deno 固定版本并在首次获取时校验 SHA-256',18,34,410,20,11,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor))
+  box.addSubview(label('• 第三方下载/媒体引擎固定版本并校验 SHA-256',18,34,410,20,11,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor))
   box.addSubview(label('• 免费构建不含 Developer ID / Apple notarization',18,10,410,20,11,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor))
   var deps=label('yt-dlp '+BUILD.ytdlpVersion+'   ·   Deno '+BUILD.denoVersion+'   ·   FFmpeg '+BUILD.ffmpegVersion,0,62,520,22,11,$.NSFontWeightRegular,$.NSColor.tertiaryLabelColor);deps.alignment=$.NSTextAlignmentCenter;c.addSubview(deps)
   var foot=label('仅下载你有权保存的内容',0,34,520,22,10,$.NSFontWeightRegular,$.NSColor.tertiaryLabelColor);foot.alignment=$.NSTextAlignmentCenter;c.addSubview(foot)
@@ -381,30 +395,34 @@ function openPath(path){ if(!path)return;var t=$.NSTask.alloc.init;t.launchPath=
 function revealPath(path){ if(!path){openPath(state.outputDir);return}var t=$.NSTask.alloc.init;t.launchPath='/usr/bin/open';t.arguments=$(['-R',path]);t.launch }
 
 ObjC.registerSubclass({
-  name:'YTDockActionsV10',
+  name:'YTDockActionsV11',
   methods:{
     'add:':{types:['void',['id']],implementation:function(sender){var t=trim(js(state.urlField.stringValue));if(!t){var p=$.NSPasteboard.generalPasteboard.stringForType($.NSPasteboardTypeString);if(p)t=js(p)};addJobs(t,this,false)}},
     'paste:':{types:['void',['id']],implementation:function(sender){var p=$.NSPasteboard.generalPasteboard.stringForType($.NSPasteboardTypeString);if(p){state.urlField.stringValue=p;addJobs(js(p),this,false)}else{setStatus('剪贴板为空');setHint('复制链接后再试')}}},
     'downloadAll:':{types:['void',['id']],implementation:function(sender){
       if(!state.jobs.length)return
-      for(var i=0;i<state.jobs.length;i++){var j=state.jobs[i];if(j.status==='ready'||j.status==='error'||j.status==='cancelled'){if((j.status==='error'||j.status==='cancelled')&&(j.title==='等待解析链接'||j.meta===j.url)){j.status='queued';j.autoDownload=true}else{j.status='waiting';j.autoDownload=true}}else if(['queued','parsing','thumb'].indexOf(j.status)>=0)j.autoDownload=true;updateJobUI(j)}
+      for(var i=0;i<state.jobs.length;i++){var j=state.jobs[i];if(['ready','error','cancelled','queued','parsing','thumb'].indexOf(j.status)>=0)snapshotProfile(j);if(j.status==='ready'||j.status==='error'||j.status==='cancelled'){if((j.status==='error'||j.status==='cancelled')&&(j.title==='等待解析链接'||j.meta===j.url)){j.status='queued';j.autoDownload=true}else{j.status='waiting';j.autoDownload=true}}else if(['queued','parsing','thumb'].indexOf(j.status)>=0)j.autoDownload=true;updateJobUI(j)}
       setStatus('已加入下载队列');setHint('任务会依次处理');processQueue(this)
     }},
     'jobAction:':{types:['void',['id']],implementation:function(sender){
       var j=jobById(Number(sender.tag));if(!j)return
       if(j.status==='done'){revealPath(j.finalPath);return}
-      if(j.status==='downloading'||j.status==='parsing'||j.status==='thumb'){if(state.activeJobId===j.id&&state.task&&state.task.running){j.status='cancelled';j.error='';updateJobUI(j);state.task.terminate;setStatus('正在取消…')}return}
+      if(j.status==='downloading'){if(state.activeJobId===j.id&&signalActive('STOP')){j.status='paused';updateJobUI(j);setStatus('已暂停');setHint(j.title)}return}
+      if(j.status==='paused'){if(state.activeJobId===j.id&&signalActive('CONT')){j.status='downloading';updateJobUI(j);setStatus('下载中');setHint(j.title)}return}
+      if(j.status==='parsing'||j.status==='thumb'){if(state.activeJobId===j.id&&state.task&&state.task.running){j.status='cancelled';j.error='';updateJobUI(j);state.task.terminate;setStatus('正在取消…')}return}
       if(j.status==='waiting'){j.status='ready';j.autoDownload=false;updateJobUI(j);return}
       if(j.status==='error'||j.status==='cancelled'){if(j.title&&j.title!=='等待解析链接'&&j.meta!==j.url){j.status='waiting';j.autoDownload=true}else{j.status='queued';j.autoDownload=true};j.error='';updateJobUI(j);processQueue(this);return}
-      if(j.status==='ready'){j.status='waiting';j.autoDownload=true;updateJobUI(j);processQueue(this)}
+      if(j.status==='ready'){snapshotProfile(j);j.status='waiting';j.autoDownload=true;updateJobUI(j);processQueue(this)}
     }},
     'removeJob:':{types:['void',['id']],implementation:function(sender){
-      var id=Number(sender.tag);if(state.activeJobId===id&&state.task&&state.task.running)return
-      var out=[];for(var i=0;i<state.jobs.length;i++){if(state.jobs[i].id===id){removeFile(state.jobs[i].thumbPath)}else out.push(state.jobs[i])};state.jobs=out;renderQueue(this);processQueue(this)
+      var id=Number(sender.tag),j=jobById(id);if(!j)return
+      if(state.activeJobId===id&&state.task&&state.task.running){j.removeAfterFinish=true;j.status='cancelled';j.error='';signalActive('CONT');try{state.task.terminate}catch(e){};updateJobUI(j);setStatus('正在取消…');return}
+      removeJobNow(id);renderQueue(this);processQueue(this)
     }},
     'clearFinished:':{types:['void',['id']],implementation:function(sender){
       var out=[];for(var i=0;i<state.jobs.length;i++){var j=state.jobs[i];if(['done','error','cancelled'].indexOf(j.status)<0)out.push(j);else removeFile(j.thumbPath)};state.jobs=out;renderQueue(this)
     }},
+    'filterChanged:':{types:['void',['id']],implementation:function(sender){var i=Number(sender.indexOfSelectedItem);state.filter=i===1?'active':(i===2?'done':(i===3?'issues':'all'));renderQueue(this)}},
     'chooseFolder:':{types:['void',['id']],implementation:function(sender){var p=$.NSOpenPanel.openPanel;p.canChooseFiles=false;p.canChooseDirectories=true;p.allowsMultipleSelection=false;if(p.runModal===$.NSModalResponseOK){state.outputDir=js(p.URL.path);state.pathLabel.stringValue=ns(state.outputDir);for(var i=0;i<state.jobs.length;i++)updateJobUI(state.jobs[i])}}},
     'openFolder:':{types:['void',['id']],implementation:function(sender){openPath(state.outputDir)}},
     'details:':{types:['void',['id']],implementation:function(sender){openLogWindow()}},
@@ -414,16 +432,16 @@ ObjC.registerSubclass({
       if(state.task){readLogDelta();if(!state.task.running)finishTask(Number(state.task.terminationStatus),this)}
       try{var pb=$.NSPasteboard.generalPasteboard,cc=Number(pb.changeCount);if(cc!==state.lastPasteboardChange){state.lastPasteboardChange=cc;var s=pb.stringForType($.NSPasteboardTypeString),links=s?parseLinks(js(s)):[];state.clipboardURL=links.length?links[0]:'';if(state.pasteBtn)state.pasteBtn.title=ns(state.clipboardURL?'加入剪贴板链接':'剪贴板')}}catch(e){}
     }},
-    'windowWillClose:':{types:['void',['id']],implementation:function(note){if(state.task&&state.task.running)state.task.terminate;removeFile(state.logPath);removeFile(state.denoZip);removeTree(state.denoCacheDir);for(var i=0;i<state.jobs.length;i++)removeFile(state.jobs[i].thumbPath);$.NSApp.terminate(0)}}
+    'windowWillClose:':{types:['void',['id']],implementation:function(note){if(state.task&&state.task.running){signalActive('CONT');state.task.terminate;}removeFile(state.logPath);removeFile(state.denoZip);removeTree(state.denoCacheDir);for(var i=0;i<state.jobs.length;i++)removeFile(state.jobs[i].thumbPath);$.NSApp.terminate(0)}}
   }
 })
 
 function run(argv){
   state.resourceDir=argv&&argv.length?String(argv[0]):'';state.binDir=state.resourceDir+'/Tools';state.ytdlp=state.binDir+'/yt-dlp'
   try{state.arch=trim(APP.doShellScript('/usr/bin/uname -m'))}catch(e){state.arch='x86_64'}
-  state.deno=state.binDir+'/deno';state.ffmpeg=state.binDir+'/ffmpeg';state.ffprobe=state.binDir+'/ffprobe';state.denoZip=js($.NSTemporaryDirectory())+'YTDock-deno.zip';state.denoCacheDir=js($.NSTemporaryDirectory())+'YTDock-Deno-'+String($.NSProcessInfo.processInfo.processIdentifier);ensureDir(state.denoCacheDir);state.outputDir=home()+'/Downloads'
+  state.deno=state.binDir+'/deno';state.ffmpeg=state.binDir+'/ffmpeg';state.denoZip=js($.NSTemporaryDirectory())+'YTDock-deno.zip';state.denoCacheDir=js($.NSTemporaryDirectory())+'YTDock-Deno-'+String($.NSProcessInfo.processInfo.processIdentifier);ensureDir(state.denoCacheDir);state.outputDir=home()+'/Downloads'
 
-  var app=$.NSApplication.sharedApplication;app.setActivationPolicy($.NSApplicationActivationPolicyRegular);var actions=$.YTDockActionsV05.alloc.init
+  var app=$.NSApplication.sharedApplication;app.setActivationPolicy($.NSApplicationActivationPolicyRegular);var actions=$.YTDockActionsV11.alloc.init
   try{var appIcon=symbol('arrow.down.circle.fill',64,$.NSFontWeightRegular);if(appIcon)app.applicationIconImage=appIcon}catch(e){}
 
   var style=$.NSWindowStyleMaskTitled|$.NSWindowStyleMaskClosable|$.NSWindowStyleMaskMiniaturizable|$.NSWindowStyleMaskResizable|$.NSWindowStyleMaskFullSizeContentView
@@ -449,9 +467,10 @@ function run(argv){
 
   // Queue header
   c.addSubview(label('下载队列',32,520,160,24,14,$.NSFontWeightSemibold,$.NSColor.labelColor))
-  state.queueCountLabel=label('暂无任务',130,520,380,24,11,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor);c.addSubview(state.queueCountLabel)
-  state.clearBtn=button('清理',636,514,86,30,actions,'clearFinished:','trash');state.clearBtn.enabled=false;c.addSubview(state.clearBtn)
-  state.downloadAllBtn=primaryButton('全部下载',734,514,154,30,actions,'downloadAll:','arrow.down.circle.fill');state.downloadAllBtn.enabled=false;c.addSubview(state.downloadAllBtn)
+  state.queueCountLabel=label('暂无任务',130,520,350,24,11,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor);c.addSubview(state.queueCountLabel)
+  state.filterControl=popup(['全部','进行中','已完成','异常'],506,514,100,30);state.filterControl.target=actions;state.filterControl.action='filterChanged:';c.addSubview(state.filterControl)
+  state.clearBtn=button('清理',616,514,82,30,actions,'clearFinished:','trash');state.clearBtn.enabled=false;c.addSubview(state.clearBtn)
+  state.downloadAllBtn=primaryButton('全部下载',708,514,180,30,actions,'downloadAll:','arrow.down.circle.fill');state.downloadAllBtn.enabled=false;c.addSubview(state.downloadAllBtn)
 
   // Scrollable queue
   state.queueScroll=$.NSScrollView.alloc.initWithFrame($.NSMakeRect(32,184,856,320));state.queueScroll.hasVerticalScroller=true;state.queueScroll.autohidesScrollers=true;state.queueScroll.borderType=$.NSNoBorder;state.queueScroll.drawsBackground=false
@@ -466,9 +485,9 @@ function run(argv){
   settings.addSubview(label('保存到',474,54,48,20,10,$.NSFontWeightSemibold,$.NSColor.secondaryLabelColor))
   state.pathLabel=label(state.outputDir,524,53,236,20,10,$.NSFontWeightRegular,$.NSColor.secondaryLabelColor);state.pathLabel.lineBreakMode=$.NSLineBreakByTruncatingMiddle;settings.addSubview(state.pathLabel)
   var chooseBtn=button('更改',766,44,72,30,actions,'chooseFolder:','folder.badge.gearshape');settings.addSubview(chooseBtn)
-  var privacy=label('不保存下载历史  ·  无后台服务  ·  无 LaunchAgent  ·  运行缓存仅在系统临时目录  ·  删除 App 即卸载',18,13,820,20,10,$.NSFontWeightRegular,$.NSColor.tertiaryLabelColor);settings.addSubview(privacy)
+  var privacy=label('会话队列不落盘  ·  无后台服务  ·  无 LaunchAgent  ·  临时缓存随会话清理  ·  删除 App 即卸载',18,13,820,20,10,$.NSFontWeightRegular,$.NSColor.tertiaryLabelColor);settings.addSubview(privacy)
 
-  c.addSubview(label('YTDock 1.0  ·  Free Distribution Build',32,34,330,22,10,$.NSFontWeightSemibold,$.NSColor.tertiaryLabelColor))
+  c.addSubview(label('YTDock 1.1  ·  macOS Download Manager',32,34,330,22,10,$.NSFontWeightSemibold,$.NSColor.tertiaryLabelColor))
   var note=label('仅下载你有权保存的内容',636,34,252,22,10,$.NSFontWeightRegular,$.NSColor.tertiaryLabelColor);note.alignment=$.NSTextAlignmentRight;c.addSubview(note)
 
   renderQueue(actions);state.timer=$.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(0.30,actions,'tick:',null,true)

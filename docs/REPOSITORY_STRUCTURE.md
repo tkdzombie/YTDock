@@ -1,13 +1,13 @@
 # Repository structure
 
-The repository separates application source from packaging and publishing infrastructure:
-
-- `Sources/` — human-edited application source.
-- `Packaging/` — the unsigned `.app` template, icon, first-open note and runtime entitlements.
-- `Scripts/` — dependency vendoring, macOS build, verification and GitHub release helpers.
+- `Sources/` — YTDock application source and native launcher.
+- `Packaging/` — unsigned app template, icon, first-open note, and runtime entitlements.
+- `Scripts/` — architecture-aware dependency vendoring, macOS build, verification, and GitHub helpers.
 - `.github/` — CI/release workflow and contribution templates.
-- `docs/` — build, publishing and Gatekeeper documentation.
+- `docs/` — architecture, build, publishing, and Gatekeeper documentation.
 - `VERSION` — single source of truth for the application/release version.
-- `DEPENDENCIES.lock` — pinned runtime versions and executable asset hashes.
+- `DEPENDENCIES.lock` — pinned third-party runtime versions and upstream hashes.
+- `COPYRIGHT.md` — authorship notice for YTDock's own project work.
+- `THIRD_PARTY_NOTICES.md` — separate attribution for bundled runtime software.
 
-Generated `.app`, `.dmg`, checksums and build metadata are written under `build/` and are intentionally ignored by Git.
+Generated apps, DMGs, checksums, and build metadata are written under `build/` and ignored by Git.

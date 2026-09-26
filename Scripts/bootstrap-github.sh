@@ -85,7 +85,7 @@ fi
 say "4/6 Create GitHub repository and push source"
 gh repo create "$REPO" \
   "--$VISIBILITY" \
-  --description "A clean macOS video/audio download manager built around yt-dlp." \
+  --description "A focused macOS video/audio download manager with a clean queue workflow." \
   --source=. \
   --remote=origin \
   --push

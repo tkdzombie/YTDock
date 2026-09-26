@@ -1,96 +1,89 @@
 # YTDock
 
-YTDock is a small macOS video/audio download manager built around **yt-dlp**, with a native macOS-style queue UI and an intentionally portable footprint.
+A focused macOS video and audio download manager designed around a clean queue workflow, predictable downloads, and a portable footprint.
 
-> Current version: **1.0.0**  
-> Free-distribution build: **ad-hoc signed, not Developer ID signed, not Apple notarized**.
+**YTDock is the application.** Its queue model, macOS interface, task state management, pause/resume behavior, build system, packaging, security checks, and release automation live in this repository. For extraction and media processing, YTDock integrates established third-party engines such as yt-dlp, Deno, and FFmpeg under their respective licenses.
 
-## Features
+> Current version: **1.1.0**  
+> Free distribution: **ad-hoc signed; not Developer ID signed or Apple notarized**.
 
-- macOS queue UI with thumbnails, title/source metadata, progress, speed and ETA;
-- paste multiple links at once, retry/cancel/remove, reveal completed files in Finder;
-- MP4 / 4K / 1080p / 720p / audio-only presets;
-- optional Safari / Chrome / Firefox cookies through yt-dlp;
-- pinned yt-dlp, Deno, FFmpeg and ffprobe runtime dependencies;
-- SHA-256 verification before dependencies are packaged;
-- universal native launcher for Apple Silicon + Intel in the macOS build;
-- no LaunchAgent, daemon, login item, privileged helper, telemetry or YTDock history database;
-- deleting `YTDock.app` removes the application and its bundled engines; downloaded media remains in the folder chosen by the user.
+## Why YTDock
 
-## Repository layout
+YTDock turns command-line download tooling into a macOS-first workflow:
 
-```text
-YTDock/
-├── .github/
-│   ├── workflows/build-macos.yml
-│   └── ISSUE_TEMPLATE/
-├── Sources/                 # application source
-│   ├── NativeLauncher.swift
-│   └── app.js
-├── Packaging/               # .app template, icon and entitlements
-│   ├── YTDock.app/
-│   ├── deno.entitlements.plist
-│   └── 首次打开.txt
-├── Scripts/                 # build / verification / GitHub automation
-│   ├── build-macos.sh
-│   ├── vendor-deps.sh
-│   ├── verify-release.sh
-│   ├── bootstrap-github.sh
-│   └── publish-tag.sh
-├── docs/
-├── VERSION
-├── DEPENDENCIES.lock
-├── CHANGELOG.md
-├── SECURITY.md
-├── PRIVACY.md
-└── THIRD_PARTY_NOTICES.md
-```
+- add one or many URLs to a visual queue;
+- parse title, source, duration, and thumbnail before downloading;
+- pause and resume the active transfer without rebuilding the queue;
+- filter the current session by active, completed, or problem tasks;
+- keep each queued task's selected quality and cookie profile predictable;
+- see progress, transfer speed, total size, ETA, errors, and completion state;
+- receive a native completion notification and reveal output in Finder;
+- use 4K / 1080p / 720p / MP4 / audio-only presets without memorizing CLI flags;
+- keep YTDock portable: no LaunchAgent, daemon, login item, privileged helper, telemetry, or YTDock history database.
 
-## One-click GitHub setup
+The session queue is intentionally memory-only. Closing YTDock clears queue state and temporary thumbnails/logs; downloaded media remains in the folder chosen by the user.
 
-If you extracted this folder to:
+## Smaller 1.1 downloads
+
+YTDock 1.0 shipped one universal DMG that carried both Apple Silicon and Intel copies of large runtime components. 1.1 publishes two release assets instead:
+
+- `YTDock-1.1.0-arm64.dmg` — Apple Silicon (M1/M2/M3/M4 and later)
+- `YTDock-1.1.0-x86_64.dmg` — Intel Macs
+
+The app launcher, Deno and FFmpeg are architecture-specific in each DMG. This avoids bundling a second unused architecture and substantially reduces download size compared with the 1.0 universal package. The official yt-dlp macOS standalone binary is kept intact.
+
+## Architecture
 
 ```text
-/Users/lazydog/Downloads/YTDock-1.0.0
+YTDock.app
+├── NativeLauncher.swift        # native Mach-O entry point
+├── app.js                      # YTDock macOS UI + queue/orchestration layer
+└── Resources/Tools/
+    ├── yt-dlp                  # extraction/download engine
+    ├── deno                    # JS runtime used by supported extractors
+    ├── ffmpeg                  # media merge/post-processing
 ```
 
-then double-click **`setup-github.command`**, or run:
+Third-party engines remain third-party software. YTDock does not claim authorship of them; the product contribution is the macOS application and orchestration around them. See `THIRD_PARTY_NOTICES.md` and `docs/ARCHITECTURE.md`.
+
+## GitHub release workflow
+
+For an existing repository, update `VERSION`, commit/push, then run:
 
 ```zsh
-cd /Users/lazydog/Downloads/YTDock-1.0.0
-./setup-github.command
+./publish.command
 ```
 
-The helper signs you into GitHub with the official `gh` CLI, initializes Git, creates your repository, pushes `main`, creates `v1.0.0`, waits for GitHub Actions, and prints the final GitHub Release URL.
-
-No Apple Developer membership or Apple credentials are required for this free publishing path. No GitHub token is stored in the repository.
-
-See [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for future releases.
+A `v1.1.0` tag triggers GitHub Actions. The workflow builds and verifies both architectures separately, then publishes both DMGs plus SHA-256 and build metadata to one GitHub Release.
 
 ## Local macOS build
 
-Double-click **`build.command`**, or run:
+Build the current Mac architecture:
 
 ```zsh
-./Scripts/build-macos.sh
-./Scripts/verify-release.sh
+./build.command
 ```
 
-Output is written to `build/free/`.
+Or choose explicitly:
 
-## Gatekeeper
+```zsh
+./Scripts/build-macos.sh arm64
+./Scripts/verify-release.sh arm64
 
-The free release path is not Apple-notarized. macOS may block the first launch on another Mac. Do **not** disable Gatekeeper globally. See [`docs/GATEKEEPER.md`](docs/GATEKEEPER.md) and [`SECURITY.md`](SECURITY.md).
+./Scripts/build-macos.sh x86_64
+./Scripts/verify-release.sh x86_64
+```
 
-## Privacy and third-party software
+Outputs are written under `build/free/<architecture>/`.
 
-See [`PRIVACY.md`](PRIVACY.md), [`DEPENDENCIES.lock`](DEPENDENCIES.lock), and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+## Security and privacy
 
-## License
+Runtime versions and upstream release hashes are pinned in `DEPENDENCIES.lock`. Release builds verify downloaded runtime assets before packaging. YTDock does not globally disable Gatekeeper and does not install persistent background components.
 
-No project license has been selected yet. Publishing the source on GitHub does not by itself grant reuse rights. Choose a project license before inviting third-party redistribution or contributions that require one.
+See `SECURITY.md`, `PRIVACY.md`, and `docs/GATEKEEPER.md`.
 
+## Project authorship
 
-## Git commit identity
+YTDock application code, product design, packaging, and release automation are maintained by **tkdzombie**. Third-party components are credited separately and keep their own copyright/license terms.
 
-`setup-github.command` uses the currently authenticated GitHub username as the default Git commit name. If GitHub does not expose a public email address, it defaults to `<username>@users.noreply.github.com`. You can simply press Return to accept these defaults, or enter your preferred commit name/email. These values are stored only in this repository's local Git configuration.
+No open-source license for YTDock's own source has been selected yet. Public source visibility does not transfer authorship of the YTDock project or the third-party components it bundles.

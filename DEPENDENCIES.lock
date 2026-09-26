@@ -1,5 +1,5 @@
-# YTDock 1.0 pinned runtime dependencies
-# SHA-256 values are for the upstream release assets fetched by the build/bootstrap paths.
+# YTDock 1.1 pinned runtime dependencies
+# SHA-256 values are for upstream release assets fetched before packaging.
 
 yt-dlp 2026.08.19
   macos: 0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202
@@ -9,7 +9,5 @@ Deno 2.9.7
   x86_64-apple-darwin.zip: 95daaff11c116a52ad54785e7914c8e9c9cdcaba793c5ed929c74ca2d8e6259a
 
 FFmpeg static 6.1.1 (eugeneware/ffmpeg-static b6.1.1)
-  ffmpeg-darwin-arm64: a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584
-  ffmpeg-darwin-x64:   ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894
-  ffprobe-darwin-arm64: bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64
-  ffprobe-darwin-x64:   fa3add0ce901f7241abe0dfc0155d958fc834aca3f8ce61f87cc712ae669c1e0
+  ffmpeg-darwin-arm64:  a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584
+  ffmpeg-darwin-x64:    ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894

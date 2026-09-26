@@ -1,4 +1,4 @@
-name: Build YTDock macOS DMG
+name: Build YTDock macOS DMGs
 
 on:
   workflow_dispatch:
@@ -17,6 +17,10 @@ jobs:
   build:
     runs-on: macos-14
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
 
     steps:
       - name: Checkout
@@ -33,29 +37,55 @@ jobs:
             exit 2
           fi
 
-      - name: Build free-distribution DMG
+      - name: Build ${{ matrix.arch }} DMG
         shell: zsh {0}
         run: |
           chmod +x Scripts/*.sh *.command
-          ./Scripts/build-macos.sh
+          ./Scripts/build-macos.sh "${{ matrix.arch }}"
 
-      - name: Verify release
+      - name: Verify ${{ matrix.arch }} release
         shell: zsh {0}
-        run: ./Scripts/verify-release.sh
+        run: ./Scripts/verify-release.sh "${{ matrix.arch }}"
 
-      - name: Upload workflow artifact
+      - name: Upload architecture artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YTDock-${{ steps.meta.outputs.version }}-macOS-free
+          name: YTDock-${{ steps.meta.outputs.version }}-${{ matrix.arch }}
           path: |
-            build/free/YTDock-${{ steps.meta.outputs.version }}.dmg
-            build/free/SHA256SUMS.txt
-            build/free/BUILDINFO.txt
+            build/free/${{ matrix.arch }}/YTDock-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.dmg
+            build/free/${{ matrix.arch }}/SHA256SUMS-${{ matrix.arch }}.txt
+            build/free/${{ matrix.arch }}/BUILDINFO-${{ matrix.arch }}.txt
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish GitHub Release for tag
-        if: startsWith(github.ref, 'refs/tags/v')
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: meta
+        shell: bash
+        run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Download both architecture artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: YTDock-${{ steps.meta.outputs.version }}-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create combined checksums
+        shell: bash
+        run: |
+          cd release-assets
+          cat SHA256SUMS-arm64.txt SHA256SUMS-x86_64.txt > SHA256SUMS.txt
+          ls -lah
+
+      - name: Publish GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -63,9 +93,11 @@ jobs:
         run: |
           set -euo pipefail
           ASSETS=(
-            "build/free/YTDock-$VERSION.dmg"
-            "build/free/SHA256SUMS.txt"
-            "build/free/BUILDINFO.txt"
+            "release-assets/YTDock-$VERSION-arm64.dmg"
+            "release-assets/YTDock-$VERSION-x86_64.dmg"
+            "release-assets/SHA256SUMS.txt"
+            "release-assets/BUILDINFO-arm64.txt"
+            "release-assets/BUILDINFO-x86_64.txt"
           )
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${ASSETS[@]}" --clobber

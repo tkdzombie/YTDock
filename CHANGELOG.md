@@ -1,16 +1,34 @@
 # Changelog
 
+## 1.1.0 — Product & Size Update
+
+### Product workflow
+
+- Added active-download pause and resume using process suspension/resumption.
+- The remove action now cancels an active task and removes it cleanly after termination.
+- Added session queue filters: All, Active, Completed, Issues.
+- Added per-task quality and browser-cookie profile snapshots so queued tasks are predictable.
+- Progress details now include reported total size in addition to speed and ETA.
+- Added native completion notifications.
+- Kept queue/history state memory-only so deleting the app remains sufficient for YTDock-owned persistent data.
+
+### Distribution
+
+- Replaced the 1.0 single universal DMG release with separate `arm64` and `x86_64` DMGs.
+- Deno, FFmpeg, and the native launcher are architecture-specific in each release.
+- Increased DMG zlib compression level.
+- GitHub Actions now builds both architectures independently and publishes both to one Release.
+- Build metadata and checksums are emitted per architecture and combined for the GitHub Release.
+- Changed the bundle identifier to `com.tkdzombie.ytdock` and added explicit project authorship metadata.
+
+### Documentation
+
+- Reframed YTDock as an independent macOS application rather than a generic "yt-dlp GUI".
+- Added architecture/authorship documentation and a copyright notice while keeping third-party attribution explicit.
+
 ## 1.0.0
 
-- Refined native macOS-style queue UI with light/dark system colors and SF Symbols.
-- Multi-link queue with metadata parsing, thumbnails, progress, speed, ETA, cancel, retry, remove and Finder reveal.
-- Quality presets for MP4, 4K, 1080p, 720p and audio-only downloads.
-- Optional Safari, Chrome and Firefox cookie access through yt-dlp.
-- Added pinned Deno runtime for modern yt-dlp JavaScript extraction support.
-- Added pinned FFmpeg/ffprobe runtime so high-quality split video/audio streams can be merged without Homebrew.
-- Added SHA-256 verification before first-run fallback components are used.
-- Disabled yt-dlp cache and redirected Deno cache/logs/thumbnails to temporary storage.
-- Added About/Security diagnostics, privacy statement, dependency lock and third-party notices.
-- Added zero-membership macOS release pipeline: universal Swift launcher, vendored dependencies, ad-hoc signing, DMG, checksums and GitHub Actions/Release automation.
-- Added repository bootstrap/publishing helpers for one-command GitHub creation, tag publishing, Actions build watching and automatic GitHub Release assets.
-- No background agent, daemon, login item, privileged helper or persistent YTDock Application Support directory.
+- First GitHub-ready public release workflow.
+- Visual queue, thumbnails, progress, retry/cancel, cookies, format presets, portable bundle model.
+- Pinned and verified yt-dlp, Deno and FFmpeg runtime dependencies.
+- Automated free-distribution DMG build and GitHub Release publishing.
