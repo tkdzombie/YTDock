@@ -16,8 +16,21 @@ for f in yt-dlp deno ffmpeg; do
   [[ -x "$APP/Contents/Resources/Tools/$f" ]] || { echo "Missing runtime: $f" >&2; exit 2; }
 done
 codesign --verify --deep --strict --verbose=2 "$APP"
-file "$APP/Contents/MacOS/YTDock" | grep -q "$ARCH" || { echo "Executable is not $ARCH" >&2; exit 2; }
-strings "$APP/Contents/MacOS/YTDock" | grep -q "YTDock" || { echo "Executable smoke check failed" >&2; exit 2; }
+EXEC="$APP/Contents/MacOS/YTDock"
+FILE_DESC="$(file "$EXEC")"
+[[ "$FILE_DESC" == *"$ARCH"* ]] || {
+  echo "Executable is not $ARCH: $FILE_DESC" >&2
+  exit 2
+}
+
+# Avoid `strings | grep -q` under pipefail: grep can exit as soon as it finds a
+# match, leaving `strings` writing into a closed pipe and producing a false
+# `failed to flush output` error on GitHub macOS runners. Scan the Mach-O
+# directly instead; -a treats it as text for this simple embedded-string check.
+/usr/bin/grep -a -F -q "YTDock" "$EXEC" || {
+  echo "Executable smoke check failed" >&2
+  exit 2
+}
 (
   cd "$BUILD"
   shasum -a 256 -c "SHA256SUMS-$ARCH.txt"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.2 — Release Verification Fix
+
+- Fixed a false-negative release verification on GitHub macOS runners.
+- Replaced the `strings | grep -q` executable smoke test that could trigger `strings: failed to flush output` under `set -o pipefail`.
+- The smoke check now scans the executable directly with `grep -a -F -q`, avoiding a producer/consumer pipe and its SIGPIPE behavior.
+- Architecture checking now captures `file` output before matching, removing another unnecessary verification pipeline.
+- No application feature or runtime-engine behavior changed from 1.2.1.
+
 ## 1.2.1 — Swift Concurrency Build Fix
 
 - Fixed Swift 6 concurrency errors in `FileHandle.readabilityHandler` and `Process.terminationHandler`.

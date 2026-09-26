@@ -2,7 +2,7 @@
 
 A native macOS video and audio download manager focused on a clean queue workflow, understandable errors, privacy, and a portable install.
 
-> Current version: **1.2.1**  
+> Current version: **1.2.2**  
 > Distribution: **ad-hoc signed; not Developer ID signed or Apple notarized**.
 
 ## What YTDock contributes
@@ -56,8 +56,8 @@ The queue is intentionally session-only. Closing YTDock clears queue state and t
 
 GitHub Releases publish two DMGs:
 
-- `YTDock-1.2.1-arm64.dmg` — Apple Silicon
-- `YTDock-1.2.1-x86_64.dmg` — Intel Macs
+- `YTDock-1.2.2-arm64.dmg` — Apple Silicon
+- `YTDock-1.2.2-x86_64.dmg` — Intel Macs
 
 Both are self-contained: the release build vendors yt-dlp, Deno, and FFmpeg before packaging.
 
@@ -87,7 +87,7 @@ Outputs are written under `build/free/<architecture>/`.
 ./publish.command
 ```
 
-A matching Git tag such as `v1.2.1` triggers GitHub Actions. The workflow builds both architectures, verifies them, creates combined SHA-256 checksums, and publishes one GitHub Release.
+A matching Git tag such as `v1.2.2` triggers GitHub Actions. The workflow builds both architectures, verifies them, creates combined SHA-256 checksums, and publishes one GitHub Release.
 
 ## Security and privacy
 
