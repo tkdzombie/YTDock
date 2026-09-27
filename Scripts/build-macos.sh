@@ -58,9 +58,11 @@ cp "$ROOT/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.m
 xattr -cr "$APP"
 ENT="$ROOT/Packaging/deno.entitlements.plist"
 codesign --force --sign - --options runtime --entitlements "$ENT" "$APP/Contents/Resources/Tools/deno"
-for exe in yt-dlp ffmpeg; do
-  codesign --force --sign - --options runtime "$APP/Contents/Resources/Tools/$exe"
-done
+# yt-dlp is a PyInstaller single-file executable. Hardened Runtime makes
+# macOS reject its Python shared library after extraction to the temp folder.
+# Keep it ad-hoc signed for bundle integrity, but do not enable runtime hardening.
+codesign --force --sign - "$APP/Contents/Resources/Tools/yt-dlp"
+codesign --force --sign - --options runtime "$APP/Contents/Resources/Tools/ffmpeg"
 codesign --force --sign - --options runtime "$APP/Contents/MacOS/YTDock"
 codesign --force --sign - --options runtime "$APP"
 codesign --verify --deep --strict --verbose=4 "$APP"
