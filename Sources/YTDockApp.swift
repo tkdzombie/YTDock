@@ -485,6 +485,8 @@ final class DownloadManager: ObservableObject {
             "--ignore-config", "--no-cache-dir", "--no-playlist",
             "--skip-download", "--dump-single-json", "--no-warnings",
             "--js-runtimes", "deno:\(deno.path)",
+            "--referer", item.url,
+            "--user-agent", Self.browserUserAgent,
             // Modern YouTube extraction requires yt-dlp's external EJS
             // challenge scripts in addition to a JavaScript runtime.
             "--remote-components", "ejs:github"
@@ -518,6 +520,8 @@ final class DownloadManager: ObservableObject {
             "--concurrent-fragments", "4",
             "--http-chunk-size", "10M",
             "--merge-output-format", "mp4",
+            "--referer", item.url,
+            "--user-agent", Self.browserUserAgent,
             "--trim-filenames", "180",
             "--paths", outputFolder.path,
             "--output", "%(title)s [%(id)s].%(ext)s",
@@ -780,6 +784,18 @@ final class DownloadManager: ObservableObject {
         if lower.contains("sign in to confirm you're not a bot") || lower.contains("sign in to confirm you’re not a bot") {
             return "网站需要登录验证。请在 Cookies 中选择你已登录的浏览器后重试。"
         }
+        if lower.contains("充电专属") || lower.contains("premium") || lower.contains("subscriber") || lower.contains("需要登录") || lower.contains("login required") || lower.contains("会员") || lower.contains("vip") {
+            return "该内容需要平台账号权限：先在 Safari、Chrome 或 Firefox 中登录并确认网页能播放，再在 YTDock 的“登录浏览器”中选择同一个浏览器后重试。没有对应会员或购买权限时无法下载。"
+        }
+        if lower.contains("cookies") && (lower.contains("permission") || lower.contains("database") || lower.contains("decrypt") || lower.contains("keychain")) {
+            return "读取登录会话失败：请先完全退出浏览器，再在 YTDock 的“登录浏览器”中选择它；macOS 若弹出钥匙串权限，请允许读取。"
+        }
+        if lower.contains("no video formats") || lower.contains("requested format is not available") {
+            return "当前账号没有可下载格式：确认浏览器已登录且能播放该内容；受会员、购买或地区权限限制的内容仍需要对应权限。"
+        }
+        if lower.contains("drm") || lower.contains("encrypted") || lower.contains("protected content") {
+            return "该视频受到 DRM 或加密保护，普通下载方式无法处理。"
+        }
         if lower.contains("javascript runtime") || lower.contains("challenge solving failed") || lower.contains("ejs") {
             return "视频站点需要 JavaScript 验证。请确认网络可访问 GitHub，并重试；也可以在 Cookies 中选择已登录的浏览器。"
         }
@@ -847,6 +863,8 @@ final class DownloadManager: ObservableObject {
     private static func hostName(from string: String) -> String {
         URL(string: string)?.host?.replacingOccurrences(of: "www.", with: "") ?? "网页"
     }
+
+    private static let browserUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15"
 
     private static func durationString(_ seconds: Double) -> String {
         let total = max(0, Int(seconds.rounded()))
@@ -1167,14 +1185,7 @@ struct DownloadCard: View {
     @ViewBuilder
     private var thumbnail: some View {
         if let url = item.thumbnailURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image): image.resizable().scaledToFill()
-                case .failure: fallbackThumbnail
-                case .empty: ZStack { Color.secondary.opacity(0.07); ProgressView().controlSize(.small) }
-                @unknown default: fallbackThumbnail
-                }
-            }
+            ThumbnailView(url: url)
         } else {
             fallbackThumbnail
         }
@@ -1227,6 +1238,44 @@ struct DownloadCard: View {
         case .failed, .cancelled: return "重试"
         case .ready, .queued: return "下载"
         }
+    }
+}
+
+private struct ThumbnailView: View {
+    let url: URL
+    @State private var image: NSImage?
+    @State private var loading = true
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image).resizable().scaledToFill()
+            } else if loading {
+                ZStack { Color.secondary.opacity(0.07); ProgressView().controlSize(.small) }
+            } else {
+                ZStack {
+                    Color.secondary.opacity(0.07)
+                    Image(systemName: "photo").font(.system(size: 28)).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .task(id: url) {
+            loading = true
+            image = await Self.load(url: url)
+            loading = false
+        }
+    }
+
+    private static func load(url: URL) async -> NSImage? {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://www.bilibili.com/", forHTTPHeaderField: "Referer")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              let image = NSImage(data: data) else { return nil }
+        return image
     }
 }
 
