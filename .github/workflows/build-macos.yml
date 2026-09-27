@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, x86_64]
+        arch: [arm64]
 
     steps:
       - name: Checkout
@@ -82,7 +82,7 @@ jobs:
       - name: Download architecture artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: YTDock-${{ steps.meta.outputs.version }}-*
+          pattern: YTDock-${{ steps.meta.outputs.version }}-arm64
           path: release-assets
           merge-multiple: true
 
@@ -91,7 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           cd release-assets
-          cat SHA256SUMS-arm64.txt SHA256SUMS-x86_64.txt > SHA256SUMS.txt
+          cat SHA256SUMS-arm64.txt > SHA256SUMS.txt
           ls -lah
 
       - name: Publish GitHub Release
@@ -103,10 +103,8 @@ jobs:
           set -euo pipefail
           ASSETS=(
             "release-assets/YTDock-$VERSION-arm64.dmg"
-            "release-assets/YTDock-$VERSION-x86_64.dmg"
             "release-assets/SHA256SUMS.txt"
             "release-assets/BUILDINFO-arm64.txt"
-            "release-assets/BUILDINFO-x86_64.txt"
           )
           BODY="YTDock $VERSION is a native SwiftUI macOS release. Choose arm64 for Apple Silicon or x86_64 for Intel. Free builds are ad-hoc signed and are not Apple notarized. See README, SECURITY.md and the changelog in the repository for details."
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
