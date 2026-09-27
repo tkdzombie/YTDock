@@ -165,6 +165,8 @@ final class DownloadItem: ObservableObject, Identifiable {
     @Published var thumbnailURL: URL?
     @Published var outputPath = ""
     @Published var errorMessage = ""
+    var expectedDuration: Double = 0
+    var downloadedDuration: Double = 0
 
     var metadataLoaded = false
     var autoDownload = false
@@ -529,6 +531,7 @@ final class DownloadManager: ObservableObject {
             "--ffmpeg-location", ffmpeg.path,
             "--progress-template", "download:YTDPROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress._total_bytes_str)s",
             "--print", "after_move:YTDOUTPUT:%(filepath)s",
+            "--print", "after_move:YDTDURATION:%(duration)s",
             "--js-runtimes", "deno:\(deno.path)",
             "--remote-components", "ejs:github"
         ]
@@ -646,6 +649,8 @@ final class DownloadManager: ObservableObject {
             objectWillChange.send()
         } else if line.hasPrefix("YTDOUTPUT:") {
             item.outputPath = String(line.dropFirst("YTDOUTPUT:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if line.hasPrefix("YDTDURATION:") {
+            item.downloadedDuration = Double(String(line.dropFirst("YDTDURATION:".count)).trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
         }
     }
 
@@ -683,6 +688,16 @@ final class DownloadManager: ObservableObject {
             }
         case .download:
             if code == 0 {
+                if item.expectedDuration >= 30, item.downloadedDuration > 0,
+                   item.downloadedDuration + 15 < item.expectedDuration {
+                    item.state = .failed
+                    item.errorMessage = "下载内容时长为 \(Self.durationString(item.downloadedDuration))，页面显示 \(Self.durationString(item.expectedDuration))。可能只下载了试看部分；请在已登录且有权限的浏览器中重试。"
+                    statusText = "下载内容不完整"
+                    hintText = item.errorMessage
+                    objectWillChange.send()
+                    processNext()
+                    return
+                }
                 item.automaticRetryCount = 0
                 item.state = .done
                 item.progress = 100
@@ -733,6 +748,8 @@ final class DownloadManager: ObservableObject {
             if let seconds = object["duration"] as? Int { return Self.durationString(Double(seconds)) }
             return ""
         }()
+        if let seconds = object["duration"] as? Double { item.expectedDuration = seconds }
+        if let seconds = object["duration"] as? Int { item.expectedDuration = Double(seconds) }
         item.subtitle = [site, uploader, duration].filter { !$0.isEmpty }.joined(separator: " · ")
         if let thumb = object["thumbnail"] as? String { item.thumbnailURL = URL(string: thumb) }
         item.errorMessage = ""
