@@ -481,7 +481,10 @@ final class DownloadManager: ObservableObject {
         var arguments = [
             "--ignore-config", "--no-cache-dir", "--no-playlist",
             "--skip-download", "--dump-single-json", "--no-warnings",
-            "--js-runtimes", "deno:\(deno.path)"
+            "--js-runtimes", "deno:\(deno.path)",
+            // Modern YouTube extraction requires yt-dlp's external EJS
+            // challenge scripts in addition to a JavaScript runtime.
+            "--remote-components", "ejs:github"
         ]
         arguments += item.cookies.arguments
         arguments.append(item.url)
@@ -508,7 +511,8 @@ final class DownloadManager: ObservableObject {
             "--ffmpeg-location", ffmpeg.path,
             "--progress-template", "download:YTDPROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress._total_bytes_str)s",
             "--print", "after_move:YTDOUTPUT:%(filepath)s",
-            "--js-runtimes", "deno:\(deno.path)"
+            "--js-runtimes", "deno:\(deno.path)",
+            "--remote-components", "ejs:github"
         ]
         arguments += item.cookies.arguments
         arguments.append(item.url)
@@ -749,6 +753,9 @@ final class DownloadManager: ObservableObject {
         let lower = text.lowercased()
         if lower.contains("sign in to confirm you're not a bot") || lower.contains("sign in to confirm you’re not a bot") {
             return "网站需要登录验证。请在 Cookies 中选择你已登录的浏览器后重试。"
+        }
+        if lower.contains("javascript runtime") || lower.contains("challenge solving failed") || lower.contains("ejs") {
+            return "视频站点需要 JavaScript 验证。请确认网络可访问 GitHub，并重试；也可以在 Cookies 中选择已登录的浏览器。"
         }
         if lower.contains("requested format is not available") {
             return "当前内容没有所选清晰度。请切换到“最佳 MP4”或较低清晰度后重试。"

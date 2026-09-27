@@ -3,6 +3,8 @@ name: Build YTDock native macOS DMGs
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
