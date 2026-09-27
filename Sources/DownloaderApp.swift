@@ -8,7 +8,7 @@ import UserNotifications
 // MARK: - Build metadata
 
 enum BuildInfo {
-    static let version = "__YTDock_VERSION__"
+    static let version = "__DOWNLOADER_VERSION__"
     static let minimumMacOS = "12.0"
 }
 
@@ -104,33 +104,6 @@ enum QualityPreset: Int, CaseIterable, Identifiable {
     }
 }
 
-enum CookieSource: Int, CaseIterable, Identifiable {
-    case none
-    case safari
-    case chrome
-    case firefox
-
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .none: return "不使用"
-        case .safari: return "Safari"
-        case .chrome: return "Chrome"
-        case .firefox: return "Firefox"
-        }
-    }
-
-    var arguments: [String] {
-        switch self {
-        case .none: return []
-        case .safari: return ["--cookies-from-browser", "safari"]
-        case .chrome: return ["--cookies-from-browser", "chrome"]
-        case .firefox: return ["--cookies-from-browser", "firefox"]
-        }
-    }
-}
-
 enum QueueFilter: Int, CaseIterable, Identifiable {
     case all
     case active
@@ -153,7 +126,6 @@ final class DownloadItem: ObservableObject, Identifiable {
     let id = UUID()
     let url: String
     let quality: QualityPreset
-    let cookies: CookieSource
 
     @Published var title = "等待解析链接"
     @Published var subtitle = ""
@@ -173,22 +145,20 @@ final class DownloadItem: ObservableObject, Identifiable {
     var removeAfterFinish = false
     var automaticRetryCount = 0
 
-    init(url: String, quality: QualityPreset, cookies: CookieSource) {
+    init(url: String, quality: QualityPreset) {
         self.url = url
         self.quality = quality
-        self.cookies = cookies
         self.subtitle = url
     }
 }
 
-// MARK: - Download manager / YTDock Core
+// MARK: - Download manager / Downloader Core
 
 @MainActor
 final class DownloadManager: ObservableObject {
     @Published var inputText = ""
     @Published var items: [DownloadItem] = []
     @Published var quality: QualityPreset = .bestMP4
-    @Published var cookies: CookieSource = .none
     @Published var filter: QueueFilter = .all
     @Published var outputFolder: URL
     @Published var statusText = "就绪"
@@ -221,7 +191,7 @@ final class DownloadManager: ObservableObject {
         self.ytdlp = tools.appendingPathComponent("yt-dlp")
         self.deno = tools.appendingPathComponent("deno")
         self.ffmpeg = tools.appendingPathComponent("ffmpeg")
-        self.tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("YTDock-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        self.tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("Downloader-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
         try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         verifyBundledTools()
         checkClipboard()
@@ -276,7 +246,7 @@ final class DownloadManager: ObservableObject {
     }
 
     var buildArchitecture: String {
-        (Bundle.main.object(forInfoDictionaryKey: "YTDockBuildArchitecture") as? String) ?? Self.machineArchitecture()
+        (Bundle.main.object(forInfoDictionaryKey: "DownloaderBuildArchitecture") as? String) ?? Self.machineArchitecture()
     }
 
     func addInput(autoStart: Bool = false) {
@@ -305,7 +275,7 @@ final class DownloadManager: ObservableObject {
         for link in links {
             let duplicate = items.contains { $0.url == link && ![.failed, .cancelled].contains($0.state) }
             guard !duplicate else { continue }
-            let item = DownloadItem(url: link, quality: quality, cookies: cookies)
+            let item = DownloadItem(url: link, quality: quality)
             item.autoDownload = autoStart
             items.append(item)
             added += 1
@@ -313,7 +283,7 @@ final class DownloadManager: ObservableObject {
 
         guard added > 0 else {
             statusText = "链接已在队列中"
-            hintText = "YTDock 不会重复添加相同的活动任务"
+            hintText = "Downloader 不会重复添加相同的活动任务"
             return
         }
         statusText = "已加入队列"
@@ -340,7 +310,7 @@ final class DownloadManager: ObservableObject {
             }
         }
         statusText = "已加入下载队列"
-        hintText = "YTDock 会先解析，再按顺序下载"
+        hintText = "Downloader 会先解析，再按顺序下载"
         objectWillChange.send()
         processNext()
     }
@@ -437,7 +407,7 @@ final class DownloadManager: ObservableObject {
 
     func copyDiagnostics() {
         let details = """
-        YTDock \(BuildInfo.version)
+        Downloader \(BuildInfo.version)
         macOS \(ProcessInfo.processInfo.operatingSystemVersionString)
         architecture \(Self.machineArchitecture())
         output \(outputFolder.path)
@@ -487,13 +457,10 @@ final class DownloadManager: ObservableObject {
             "--ignore-config", "--no-cache-dir", "--no-playlist",
             "--skip-download", "--dump-single-json", "--no-warnings",
             "--js-runtimes", "deno:\(deno.path)",
-            "--referer", item.url,
-            "--user-agent", Self.browserUserAgent,
             // Modern YouTube extraction requires yt-dlp's external EJS
             // challenge scripts in addition to a JavaScript runtime.
             "--remote-components", "ejs:github"
         ]
-        arguments += item.cookies.arguments
         arguments.append(item.url)
         startProcess(kind: .metadata, item: item, executable: ytdlp, arguments: arguments)
     }
@@ -522,8 +489,6 @@ final class DownloadManager: ObservableObject {
             "--concurrent-fragments", "4",
             "--http-chunk-size", "10M",
             "--merge-output-format", "mp4",
-            "--referer", item.url,
-            "--user-agent", Self.browserUserAgent,
             "--trim-filenames", "180",
             "--paths", outputFolder.path,
             "--output", "%(title)s [%(id)s].%(ext)s",
@@ -535,7 +500,6 @@ final class DownloadManager: ObservableObject {
             "--js-runtimes", "deno:\(deno.path)",
             "--remote-components", "ejs:github"
         ]
-        arguments += item.cookies.arguments
         arguments.append(item.url)
         startProcess(kind: .download, item: item, executable: ytdlp, arguments: arguments)
     }
@@ -565,7 +529,7 @@ final class DownloadManager: ObservableObject {
 
         // FileHandle/Process callbacks are @Sendable on current macOS SDKs.  Keep
         // immutable strong references here and hop back to MainActor before touching
-        // YTDock state.  Weak capture lists create mutable capture boxes, which Swift
+        // Downloader state.  Weak capture lists create mutable capture boxes, which Swift
         // 6 rejects as "reference to captured var ... in concurrently-executing code".
         let manager = self
         let processItem = item
@@ -608,7 +572,7 @@ final class DownloadManager: ObservableObject {
             proc.terminationHandler = nil
             appendLog("启动下载引擎失败：\(error.localizedDescription)\n")
             item.state = .failed
-            item.errorMessage = "无法启动内置下载引擎。请重新下载 YTDock。"
+            item.errorMessage = "无法启动内置下载引擎。请重新下载 Downloader。"
             self.process = nil
             self.runKind = nil
             self.activeItem = nil
@@ -691,7 +655,7 @@ final class DownloadManager: ObservableObject {
                 if item.expectedDuration >= 30, item.downloadedDuration > 0,
                    item.downloadedDuration + 15 < item.expectedDuration {
                     item.state = .failed
-                    item.errorMessage = "下载内容时长为 \(Self.durationString(item.downloadedDuration))，页面显示 \(Self.durationString(item.expectedDuration))。可能只下载了试看部分；请在已登录且有权限的浏览器中重试。"
+                    item.errorMessage = "下载内容时长为 \(Self.durationString(item.downloadedDuration))，页面显示 \(Self.durationString(item.expectedDuration))。可能只下载了试看部分；请在公开可获取的链接中重试。"
                     statusText = "下载内容不完整"
                     hintText = item.errorMessage
                     objectWillChange.send()
@@ -798,23 +762,11 @@ final class DownloadManager: ObservableObject {
 
     private func friendlyError(from text: String) -> String {
         let lower = text.lowercased()
-        if lower.contains("sign in to confirm you're not a bot") || lower.contains("sign in to confirm you’re not a bot") {
-            return "网站需要登录验证。请在 Cookies 中选择你已登录的浏览器后重试。"
-        }
-        if lower.contains("充电专属") || lower.contains("premium") || lower.contains("subscriber") || lower.contains("需要登录") || lower.contains("login required") || lower.contains("会员") || lower.contains("vip") {
-            return "该内容需要平台账号权限：先在 Safari、Chrome 或 Firefox 中登录并确认网页能播放，再在 YTDock 的“登录浏览器”中选择同一个浏览器后重试。没有对应会员或购买权限时无法下载。"
-        }
-        if lower.contains("cookies") && (lower.contains("permission") || lower.contains("database") || lower.contains("decrypt") || lower.contains("keychain")) {
-            return "读取登录会话失败：请先完全退出浏览器，再在 YTDock 的“登录浏览器”中选择它；macOS 若弹出钥匙串权限，请允许读取。"
-        }
-        if lower.contains("no video formats") || lower.contains("requested format is not available") {
-            return "当前账号没有可下载格式：确认浏览器已登录且能播放该内容；受会员、购买或地区权限限制的内容仍需要对应权限。"
-        }
         if lower.contains("drm") || lower.contains("encrypted") || lower.contains("protected content") {
             return "该视频受到 DRM 或加密保护，普通下载方式无法处理。"
         }
         if lower.contains("javascript runtime") || lower.contains("challenge solving failed") || lower.contains("ejs") {
-            return "视频站点需要 JavaScript 验证。请确认网络可访问 GitHub，并重试；也可以在 Cookies 中选择已登录的浏览器。"
+            return "站点验证失败或内容不是公开可获取内容。请确认链接可公开播放后重试。"
         }
         if lower.contains("requested format is not available") {
             return "当前内容没有所选清晰度。请切换到“最佳 MP4”或较低清晰度后重试。"
@@ -823,16 +775,16 @@ final class DownloadManager: ObservableObject {
             return "暂不支持这个链接，或链接格式无法识别。"
         }
         if lower.contains("http error 403") || lower.contains("forbidden") {
-            return "服务器拒绝了本次请求（403）。可尝试浏览器 Cookies，或稍后重试。"
+            return "服务器拒绝了公开下载请求（403）。请确认内容可公开访问后稍后重试。"
         }
         if lower.contains("http error 429") || lower.contains("too many requests") {
             return "请求过于频繁（429）。建议稍后再试。"
         }
         if lower.contains("video unavailable") || lower.contains("this video is unavailable") {
-            return "这个视频当前不可用，可能已删除、受地区限制或需要登录。"
+            return "这个视频当前不可用，可能已删除、受地区限制或不支持公开下载。"
         }
         if lower.contains("ffmpeg") && (lower.contains("not found") || lower.contains("not installed")) {
-            return "内置 FFmpeg 不可用。请重新下载完整 YTDock。"
+            return "内置 FFmpeg 不可用。请重新下载完整 Downloader。"
         }
 
         let candidate = text.components(separatedBy: .newlines)
@@ -855,10 +807,10 @@ final class DownloadManager: ObservableObject {
     private func deliverCompletionNotification(for item: DownloadItem) {
         guard completionNotifications else { return }
         let content = UNMutableNotificationContent()
-        content.title = "YTDock 下载完成"
+        content.title = "Downloader 下载完成"
         content.body = item.title
         content.sound = .default
-        let request = UNNotificationRequest(identifier: "ytdock-\(item.id.uuidString)", content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: "downloader-\(item.id.uuidString)", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
 
@@ -881,7 +833,6 @@ final class DownloadManager: ObservableObject {
         URL(string: string)?.host?.replacingOccurrences(of: "www.", with: "") ?? "网页"
     }
 
-    private static let browserUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15"
 
     private static func durationString(_ seconds: Double) -> String {
         let total = max(0, Int(seconds.rounded()))
@@ -930,7 +881,7 @@ struct MainView: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 1) {
-                Text("YTDock")
+                Text("Downloader")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                 Text(manager.hintText)
                     .font(.system(size: 12))
@@ -1053,15 +1004,7 @@ struct MainView: View {
 
                 Divider().frame(height: 24)
 
-                Text("Cookies").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-                Picker("Cookies", selection: $manager.cookies) {
-                    ForEach(CookieSource.allCases) { source in Text(source.title).tag(source) }
-                }
-                .labelsHidden().frame(width: 120)
-
-                Divider().frame(height: 24)
-
-                Text("保存到").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                                Text("保存到").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                 Text(manager.outputFolder.path)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -1078,7 +1021,7 @@ struct MainView: View {
                 .toggleStyle(.switch)
                 .font(.system(size: 11))
             }
-            Text("每个任务在加入队列时会锁定格式与 Cookie 配置 · 会话队列不落盘 · 无后台服务 · 删除 App 即卸载")
+            Text("每个任务在加入队列时锁定格式 · 仅处理公开可获取内容 · 无后台服务 · 删除 App 即卸载")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1091,11 +1034,11 @@ struct MainView: View {
 
     private var footer: some View {
         HStack {
-            Text("YTDock \(BuildInfo.version) · Native macOS Download Manager")
+            Text("Downloader \(BuildInfo.version) · Public Media Downloader")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.tertiary)
             Spacer()
-            Text("仅下载你有权保存的内容")
+            Text("仅下载公开可获取的内容")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
         }
@@ -1170,11 +1113,6 @@ struct DownloadCard: View {
                     Text(item.quality.title)
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
-                    if item.cookies != .none {
-                        Text(item.cookies.title)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
                 }
             }
 
@@ -1242,7 +1180,7 @@ struct DownloadCard: View {
         if item.state == .ready { return "已解析，可开始下载" }
         if item.state == .waiting { return "等待前面的任务完成" }
         if item.state == .parsing { return "正在读取标题、来源、时长和缩略图" }
-        return "等待 YTDock 解析链接"
+        return "等待 Downloader 解析链接"
     }
 
     private var actionTitle: String {
@@ -1286,7 +1224,6 @@ private struct ThumbnailView: View {
     private static func load(url: URL) async -> NSImage? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
         request.setValue("https://www.bilibili.com/", forHTTPHeaderField: "Referer")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse,
@@ -1361,12 +1298,12 @@ struct AboutView: View {
                 .font(.system(size: 54, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.accentColor)
-            Text("YTDock").font(.system(size: 24, weight: .bold, design: .rounded))
+            Text("Downloader").font(.system(size: 24, weight: .bold, design: .rounded))
             Text("Version \(BuildInfo.version) · \(manager.buildArchitecture)").font(.caption).foregroundStyle(.secondary)
             Text(manager.runtimeSummary)
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.tertiary)
-            Text("一款专注于 macOS 下载工作流的独立应用。YTDock 自己负责界面、队列、任务状态、错误解释、交互与发行工程；媒体提取和处理由捆绑的第三方引擎完成。")
+            Text("一款专注于 macOS 下载工作流的独立应用。Downloader 自己负责界面、队列、任务状态、错误解释、交互与发行工程；媒体提取和处理由捆绑的第三方引擎完成。")
                 .font(.system(size: 12))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -1374,7 +1311,7 @@ struct AboutView: View {
             Divider()
             VStack(alignment: .leading, spacing: 7) {
                 Label("原生 SwiftUI 主程序", systemImage: "swift")
-                Label("无后台服务 / 无 LaunchAgent / 无 YTDock 历史数据库", systemImage: "hand.raised")
+                Label("无后台服务 / 无 LaunchAgent / 无历史数据库", systemImage: "hand.raised")
                 Label("发行依赖固定版本并校验 SHA-256", systemImage: "checkmark.shield")
                 Label("免费构建为 ad-hoc 签名，不是 Developer ID / notarized", systemImage: "info.circle")
             }
@@ -1391,7 +1328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
-struct YTDockApp: App {
+struct DownloaderApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var manager = DownloadManager()
 

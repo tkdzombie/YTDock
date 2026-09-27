@@ -1,4 +1,4 @@
-name: Build YTDock native macOS DMGs
+name: Build Downloader native macOS DMGs
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ytdock-release-${{ github.ref }}
+  group: downloader-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -35,10 +35,10 @@ jobs:
           set -euo pipefail
           VERSION="$(tr -d '[:space:]' < VERSION)"
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid VERSION=$VERSION" >&2; exit 2; }
-          test -f Sources/YTDockApp.swift
+          test -f Sources/DownloaderApp.swift
           test ! -e Sources/app.js
           test ! -e Sources/NativeLauncher.swift
-          grep -q '__YTDock_VERSION__' Sources/YTDockApp.swift
+          grep -q '__DOWNLOADER_VERSION__' Sources/DownloaderApp.swift
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
             echo "Tag $GITHUB_REF_NAME does not match VERSION=$VERSION" >&2
@@ -58,9 +58,9 @@ jobs:
       - name: Upload architecture artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YTDock-${{ steps.meta.outputs.version }}-${{ matrix.arch }}
+          name: Downloader-${{ steps.meta.outputs.version }}-${{ matrix.arch }}
           path: |
-            build/free/${{ matrix.arch }}/YTDock-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.dmg
+            build/free/${{ matrix.arch }}/Downloader-${{ steps.meta.outputs.version }}-${{ matrix.arch }}.dmg
             build/free/${{ matrix.arch }}/SHA256SUMS-${{ matrix.arch }}.txt
             build/free/${{ matrix.arch }}/BUILDINFO-${{ matrix.arch }}.txt
           if-no-files-found: error
@@ -82,7 +82,7 @@ jobs:
       - name: Download architecture artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: YTDock-${{ steps.meta.outputs.version }}-arm64
+          pattern: Downloader-${{ steps.meta.outputs.version }}-arm64
           path: release-assets
           merge-multiple: true
 
@@ -102,16 +102,16 @@ jobs:
         run: |
           set -euo pipefail
           ASSETS=(
-            "release-assets/YTDock-$VERSION-arm64.dmg"
+            "release-assets/Downloader-$VERSION-arm64.dmg"
             "release-assets/SHA256SUMS.txt"
             "release-assets/BUILDINFO-arm64.txt"
           )
-          BODY="YTDock $VERSION is a native SwiftUI macOS release. Choose arm64 for Apple Silicon or x86_64 for Intel. Free builds are ad-hoc signed and are not Apple notarized. See README, SECURITY.md and the changelog in the repository for details."
+          BODY="Downloader $VERSION is a native SwiftUI macOS release. This build targets Apple Silicon (arm64). Free builds are ad-hoc signed and are not Apple notarized. See README, SECURITY.md and the changelog in the repository for details."
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${ASSETS[@]}" --clobber
           else
             gh release create "$GITHUB_REF_NAME" "${ASSETS[@]}" \
               --verify-tag \
-              --title "YTDock $VERSION" \
+              --title "Downloader $VERSION" \
               --notes "$BODY"
           fi

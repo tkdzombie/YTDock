@@ -1,12 +1,12 @@
-YTDock — 首次打开
+Downloader — 首次打开
 
-YTDock 1.2 使用原生 SwiftUI 主程序，并将 yt-dlp、Deno、FFmpeg 一起打包在 App 内。
-不安装 LaunchAgent、daemon、privileged helper 或 YTDock Application Support 数据库。
+Downloader 1.2 使用原生 SwiftUI 主程序，并将 yt-dlp、Deno、FFmpeg 一起打包在 App 内。
+不安装 LaunchAgent、daemon、privileged helper 或 Downloader Application Support 数据库。
 
 安装：
-1. 将 YTDock.app 拖到 Applications（应用程序）。
+1. 将 Downloader.app 拖到 Applications（应用程序）。
 2. 由于免费版本没有 Developer ID / Apple notarization，首次打开可能被 Gatekeeper 拦截。
 3. 请使用 macOS 提供的“右键 → 打开”，或在“系统设置 → 隐私与安全性”中允许这一次打开。
 
-请不要为了 YTDock 全局关闭 Gatekeeper。
-删除 /Applications/YTDock.app 即可删除 YTDock 及其内置运行组件；你主动下载的媒体文件不会被删除。
+请不要为了 Downloader 全局关闭 Gatekeeper。
+删除 /Applications/Downloader.app 即可删除 Downloader 及其内置运行组件；你主动下载的媒体文件不会被删除。

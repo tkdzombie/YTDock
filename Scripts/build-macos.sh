@@ -14,10 +14,10 @@ ARCH="${1:-$(uname -m)}"
 [[ "$ARCH" == "arm64" || "$ARCH" == "x86_64" ]] || { echo "Architecture must be arm64 or x86_64" >&2; exit 2; }
 
 BUILD="$ROOT/build/free/$ARCH"
-APP="$BUILD/YTDock.app"
+APP="$BUILD/Downloader.app"
 STAGE="$BUILD/dmg-root"
-DMG="$BUILD/YTDock-$VERSION-$ARCH.dmg"
-TEMPLATE="$ROOT/Packaging/YTDock.app"
+DMG="$BUILD/Downloader-$VERSION-$ARCH.dmg"
+TEMPLATE="$ROOT/Packaging/Downloader.app"
 GENERATED="$BUILD/generated"
 
 rm -rf "$BUILD"
@@ -27,23 +27,23 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Tools"
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :YTDockBuildArchitecture $ARCH" "$APP/Contents/Info.plist" 2>/dev/null || \
-  /usr/libexec/PlistBuddy -c "Add :YTDockBuildArchitecture string $ARCH" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :DownloaderBuildArchitecture $ARCH" "$APP/Contents/Info.plist" 2>/dev/null || \
+  /usr/libexec/PlistBuddy -c "Add :DownloaderBuildArchitecture string $ARCH" "$APP/Contents/Info.plist"
 
 # Native SwiftUI application. There is no JXA/osascript application layer in 1.2+.
-sed "s/__YTDock_VERSION__/$VERSION/g" "$ROOT/Sources/YTDockApp.swift" > "$GENERATED/YTDockApp.swift"
+sed "s/__DOWNLOADER_VERSION__/$VERSION/g" "$ROOT/Sources/DownloaderApp.swift" > "$GENERATED/DownloaderApp.swift"
 TARGET="$ARCH-apple-macos12.0"
 xcrun --sdk macosx swiftc \
   -O \
   -parse-as-library \
   -swift-version 5 \
   -target "$TARGET" \
-  "$GENERATED/YTDockApp.swift" \
+  "$GENERATED/DownloaderApp.swift" \
   -framework SwiftUI \
   -framework AppKit \
   -framework UserNotifications \
-  -o "$APP/Contents/MacOS/YTDock"
-chmod 755 "$APP/Contents/MacOS/YTDock"
+  -o "$APP/Contents/MacOS/Downloader"
+chmod 755 "$APP/Contents/MacOS/Downloader"
 
 # Pinned, architecture-specific runtime dependencies.
 "$ROOT/Scripts/vendor-deps.sh" "$APP/Contents/Resources/Tools" "$ARCH"
@@ -63,12 +63,12 @@ codesign --force --sign - --entitlements "$ENT" "$APP/Contents/Resources/Tools/d
 # Keep it ad-hoc signed for bundle integrity, but do not enable runtime hardening.
 codesign --force --sign - "$APP/Contents/Resources/Tools/yt-dlp"
 codesign --force --sign - "$APP/Contents/Resources/Tools/ffmpeg"
-codesign --force --sign - "$APP/Contents/MacOS/YTDock"
+codesign --force --sign - "$APP/Contents/MacOS/Downloader"
 codesign --force --sign - "$APP"
 codesign --verify --deep --strict --verbose=4 "$APP"
 
 {
-  echo "YTDock $VERSION"
+  echo "Downloader $VERSION"
   echo "Application architecture: native SwiftUI"
   echo "Release architecture: $ARCH"
   echo "Build UTC: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -77,16 +77,16 @@ codesign --verify --deep --strict --verbose=4 "$APP"
   if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "Source commit: $(git -C "$ROOT" rev-parse HEAD)"
   fi
-  echo "Executable: $(file "$APP/Contents/MacOS/YTDock")"
+  echo "Executable: $(file "$APP/Contents/MacOS/Downloader")"
   echo
   shasum -a 256 \
-    "$APP/Contents/MacOS/YTDock" \
+    "$APP/Contents/MacOS/Downloader" \
     "$APP/Contents/Resources/Tools/yt-dlp" \
     "$APP/Contents/Resources/Tools/deno" \
     "$APP/Contents/Resources/Tools/ffmpeg"
 } > "$BUILD/BUILDINFO-$ARCH.txt"
 
-cp -R "$APP" "$STAGE/YTDock.app"
+cp -R "$APP" "$STAGE/Downloader.app"
 ln -s /Applications "$STAGE/Applications"
 cp "$ROOT/Packaging/首次打开.txt" "$STAGE/首次打开.txt"
 cp "$ROOT/PRIVACY.md" "$STAGE/PRIVACY.md"
@@ -94,11 +94,11 @@ cp "$ROOT/SECURITY.md" "$STAGE/SECURITY.md"
 cp "$BUILD/BUILDINFO-$ARCH.txt" "$STAGE/BUILDINFO.txt"
 
 # UDZO + max zlib level keeps the runtime self-contained while reducing download size.
-hdiutil create -volname "YTDock $VERSION ($ARCH)" -srcfolder "$STAGE" -ov -format UDZO -imagekey zlib-level=9 "$DMG"
+hdiutil create -volname "Downloader $VERSION ($ARCH)" -srcfolder "$STAGE" -ov -format UDZO -imagekey zlib-level=9 "$DMG"
 codesign --force --sign - "$DMG" 2>/dev/null || true
 (
   cd "$BUILD"
-  shasum -a 256 "YTDock-$VERSION-$ARCH.dmg" > "SHA256SUMS-$ARCH.txt"
+  shasum -a 256 "Downloader-$VERSION-$ARCH.dmg" > "SHA256SUMS-$ARCH.txt"
 )
 
 echo
