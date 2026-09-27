@@ -30,7 +30,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Tools"
 /usr/libexec/PlistBuddy -c "Set :DownloaderBuildArchitecture $ARCH" "$APP/Contents/Info.plist" 2>/dev/null || \
   /usr/libexec/PlistBuddy -c "Add :DownloaderBuildArchitecture string $ARCH" "$APP/Contents/Info.plist"
 
-# Native SwiftUI application. There is no JXA/osascript application layer in 1.2+.
+# Native SwiftUI application. There is no JXA/osascript application layer.
 sed "s/__DOWNLOADER_VERSION__/$VERSION/g" "$ROOT/Sources/DownloaderApp.swift" > "$GENERATED/DownloaderApp.swift"
 TARGET="$ARCH-apple-macos12.0"
 xcrun --sdk macosx swiftc \

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible YTDock problem
+description: Report a reproducible Downloader problem
 title: "[Bug] "
 labels: ["bug"]
 body:
@@ -28,7 +28,7 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      placeholder: "1. Open YTDock\n2. Paste ...\n3. Click ..."
+      placeholder: "1. Open Downloader\n2. Paste ...\n3. Click ..."
     validations:
       required: true
   - type: textarea

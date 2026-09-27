@@ -1,6 +1,6 @@
 # Third-party notices
 
-Downloader 1.2 release builds bundle runtime components that are separate projects from Downloader:
+Downloader 2.0 release builds bundle runtime components that are separate projects from Downloader:
 
 - **yt-dlp 2026.08.19** — extraction/download engine. Release assets and included third-party code remain subject to yt-dlp's upstream license and bundled third-party notices.
 - **Deno 2.9.7** — JavaScript runtime used by supported extractor workflows; distributed under Deno's upstream license.

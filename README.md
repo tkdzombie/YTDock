@@ -2,7 +2,7 @@
 
 A native macOS video and audio download manager focused on a clean queue workflow, understandable errors, privacy, and a portable install.
 
-> Current version: **1.2.2**  
+> Current version: **2.0.0**
 > Distribution: **ad-hoc signed; not Developer ID signed or Apple notarized**.
 
 ## What Downloader contributes
@@ -20,15 +20,16 @@ Downloader is not a fork of yt-dlp and does not claim authorship of third-party 
 
 For extraction and media processing, Downloader invokes bundled copies of **yt-dlp**, **Deno**, and **FFmpeg** under their respective licenses. Think of these as runtime engines behind the Downloader application, not the Downloader UI or product layer.
 
-## Highlights in 1.2
+## Highlights in 2.0
 
 - **Native SwiftUI application** — the previous JXA/osascript UI layer has been removed.
 - **Downloader Core queue state machine** — parsing, waiting, downloading, paused, completed, failed, and cancelled are managed by the app.
 - **Human-readable failures** — common engine errors are translated into actions a normal user can understand.
 - **Drag links directly into the window** in addition to paste/clipboard intake.
 - **Session-only completion notifications** — opt in from the main window; no persistent preference database is created by Downloader.
-- **Per-task snapshots** — quality and browser-cookie choices are locked when each URL enters the queue.
-- **Architecture-specific releases** — separate Apple Silicon and Intel DMGs avoid carrying a second Deno/FFmpeg architecture.
+- **Per-task snapshots** — quality choices are locked when each URL enters the queue.
+- **Public-content mode** — Downloader does not read browser cookies or login sessions.
+- **Apple Silicon release** — the current workflow publishes one arm64 DMG to keep the package focused and smaller.
 
 ## Download workflow
 
@@ -54,12 +55,11 @@ The queue is intentionally session-only. Closing Downloader clears queue state a
 
 ## Release assets
 
-GitHub Releases publish two DMGs:
+GitHub Actions publishes one Apple Silicon artifact:
 
-- `Downloader-1.2.2-arm64.dmg` — Apple Silicon
-- `Downloader-1.2.2-x86_64.dmg` — Intel Macs
+- `Downloader-2.0.0-arm64` — unzip this artifact to obtain the DMG
 
-Both are self-contained: the release build vendors yt-dlp, Deno, and FFmpeg before packaging.
+The artifact is self-contained: the release build vendors yt-dlp, Deno, and FFmpeg before packaging.
 
 ## Build locally on macOS
 
@@ -72,9 +72,6 @@ Or explicitly:
 ```zsh
 ./Scripts/build-macos.sh arm64
 ./Scripts/verify-release.sh arm64
-
-./Scripts/build-macos.sh x86_64
-./Scripts/verify-release.sh x86_64
 ```
 
 Outputs are written under `build/free/<architecture>/`.
@@ -87,7 +84,7 @@ Outputs are written under `build/free/<architecture>/`.
 ./publish.command
 ```
 
-A matching Git tag such as `v1.2.2` triggers GitHub Actions. The workflow builds both architectures, verifies them, creates combined SHA-256 checksums, and publishes one GitHub Release.
+A matching Git tag such as `v2.0.0` triggers GitHub Actions. The workflow builds, verifies, and publishes the Apple Silicon DMG.
 
 ## Security and privacy
 

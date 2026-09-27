@@ -1,4 +1,4 @@
-# Downloader 1.2 Privacy
+# Downloader 2.0 Privacy
 
 Downloader is designed as a local macOS download manager.
 

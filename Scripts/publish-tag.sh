@@ -29,7 +29,7 @@ if git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --exit-code --tags orig
   exit 4
 fi
 
-git tag -a "$TAG" -m "YTDock $VERSION"
+git tag -a "$TAG" -m "Downloader $VERSION"
 git push origin "$TAG"
 echo "Pushed $TAG. GitHub Actions will build and publish the Release."
 

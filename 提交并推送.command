@@ -5,7 +5,7 @@ ROOT="${0:A:h}"
 cd "$ROOT"
 
 git add -A
-git commit -m "Release Downloader 2.0 public downloader" || true
+git commit -m "Polish Downloader repository and documentation" || true
 git push origin main
 
 echo

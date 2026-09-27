@@ -1,17 +1,9 @@
-# Publishing YTDock
+# Publishing Downloader
 
-## Normal release flow
+1. Update source and documentation.
+2. Set the semantic version in `VERSION`.
+3. Commit and push `main` for an artifact build.
+4. For a public release, create a matching tag such as `v2.0.0`.
+5. GitHub Actions builds and verifies the Apple Silicon DMG, then publishes release assets for tags.
 
-1. Update application code and documentation.
-2. Set `VERSION` to the new semantic version (for this release: `1.2.2`).
-3. Commit and push `main`.
-4. Run `./publish.command`.
-5. Confirm creation of the matching tag (`v1.2.2`).
-6. GitHub Actions builds Apple Silicon and Intel DMGs independently.
-7. The release job publishes both DMGs, combined SHA-256 checksums, and per-architecture BUILDINFO files.
-
-A tag whose version does not match `VERSION` is rejected by the workflow.
-
-## Free distribution boundary
-
-The automated build uses ad-hoc code signing for bundle integrity only. It does not produce Developer ID trust or Apple notarization. No Apple credential, signing key, GitHub Personal Access Token, or app-specific password is stored in this repository.
+The free distribution uses ad-hoc signing. It does not provide Developer ID trust or Apple notarization.

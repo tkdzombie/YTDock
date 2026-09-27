@@ -37,9 +37,9 @@ OWNER="$(gh api user --jq .login)"
 echo "Signed in as: $OWNER"
 
 say "2/6 Repository settings"
-printf "Repository name [YTDock]: "
+printf "Repository name [Downloader]: "
 read -r REPO_NAME
-REPO_NAME="${REPO_NAME:-YTDock}"
+REPO_NAME="${REPO_NAME:-Downloader}"
 [[ "$REPO_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || die "Invalid repository name: $REPO_NAME"
 
 printf "Visibility: public or private [public]: "
@@ -79,7 +79,7 @@ fi
 
 git add -A
 if ! git diff --cached --quiet; then
-  git commit -m "Release YTDock $VERSION"
+  git commit -m "Release Downloader $VERSION"
 fi
 
 say "4/6 Create GitHub repository and push source"
@@ -96,7 +96,7 @@ say "5/6 Create release tag"
 if git rev-parse "$TAG" >/dev/null 2>&1; then
   echo "Local tag $TAG already exists; using it."
 else
-  git tag -a "$TAG" -m "YTDock $VERSION"
+  git tag -a "$TAG" -m "Downloader $VERSION"
 fi
 git push origin "$TAG"
 

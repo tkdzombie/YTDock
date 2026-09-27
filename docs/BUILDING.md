@@ -1,37 +1,18 @@
-# Building YTDock on macOS
+# Building Downloader on macOS
 
 ## Requirements
 
 - macOS 12 or newer
-- Xcode Command Line Tools / Xcode toolchain with SwiftUI support
-- Internet access while vendoring pinned runtime dependencies
+- Xcode Command Line Tools or Xcode with SwiftUI support
+- Internet access while vendoring the pinned runtime dependencies
 
-Build for the current Mac architecture:
-
-```zsh
-./build.command
-```
-
-Or build a specific release architecture:
+Build the Apple Silicon package:
 
 ```zsh
 ./Scripts/build-macos.sh arm64
 ./Scripts/verify-release.sh arm64
-
-./Scripts/build-macos.sh x86_64
-./Scripts/verify-release.sh x86_64
 ```
 
-Output is written to `build/free/<architecture>/`.
+The DMG is written to `build/free/arm64/Downloader-<version>-arm64.dmg`. The build vendors yt-dlp, Deno, and FFmpeg, verifies SHA-256 values, signs the bundle ad-hoc, and creates a compressed DMG.
 
-Each build:
-
-1. compiles `Sources/YTDockApp.swift` into the real native app executable;
-2. vendors pinned yt-dlp, Deno, and FFmpeg runtime assets;
-3. verifies upstream SHA-256 values;
-4. ad-hoc signs nested executable code and the app bundle;
-5. verifies the bundle and rejects the legacy JXA application layer;
-6. creates a compressed UDZO DMG;
-7. writes build metadata and checksums.
-
-This free build is **not** Developer ID signed and **not** Apple notarized.
+The free build is not Developer ID signed or Apple notarized.

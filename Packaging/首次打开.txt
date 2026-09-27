@@ -1,6 +1,6 @@
 Downloader — 首次打开
 
-Downloader 1.2 使用原生 SwiftUI 主程序，并将 yt-dlp、Deno、FFmpeg 一起打包在 App 内。
+Downloader 2.0 使用原生 SwiftUI 主程序，并将 yt-dlp、Deno、FFmpeg 一起打包在 App 内。
 不安装 LaunchAgent、daemon、privileged helper 或 Downloader Application Support 数据库。
 
 安装：

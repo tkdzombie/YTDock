@@ -63,7 +63,7 @@ mkdir -p "$TMP/deno"
 ditto -x -k "$TMP/$DENO_ASSET" "$TMP/deno"
 install -m 755 "$TMP/deno/deno" "$DEST/deno"
 
-# Architecture-specific FFmpeg. ffprobe is intentionally not bundled because YTDock does not invoke it.
+# Architecture-specific FFmpeg. ffprobe is intentionally not bundled because Downloader does not invoke it.
 fetch "https://github.com/eugeneware/ffmpeg-static/releases/download/$FF_TAG/ffmpeg-darwin-$FF_ARCH" "$TMP/ffmpeg"
 verify "$TMP/ffmpeg" "$FF_SHA"
 install -m 755 "$TMP/ffmpeg" "$DEST/ffmpeg"
