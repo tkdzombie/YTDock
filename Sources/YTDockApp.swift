@@ -91,13 +91,13 @@ enum QualityPreset: Int, CaseIterable, Identifiable {
     var formatSelector: String {
         switch self {
         case .bestMP4:
-            return "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+            return "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best"
         case .upTo4K:
-            return "bestvideo[height<=2160]+bestaudio/best[height<=2160]/best"
+            return "bestvideo[height<=2160]+bestaudio/bestvideo[height<=2160]/best[height<=2160]/best"
         case .upTo1080p:
-            return "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
+            return "bestvideo[height<=1080]+bestaudio/bestvideo[height<=1080]/best[height<=1080]/best"
         case .upTo720p:
-            return "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+            return "bestvideo[height<=720]+bestaudio/bestvideo[height<=720]/best[height<=720]/best"
         case .audioOnly:
             return "bestaudio[ext=m4a]/bestaudio"
         }
@@ -169,6 +169,7 @@ final class DownloadItem: ObservableObject, Identifiable {
     var metadataLoaded = false
     var autoDownload = false
     var removeAfterFinish = false
+    var automaticRetryCount = 0
 
     init(url: String, quality: QualityPreset, cookies: CookieSource) {
         self.url = url
@@ -330,6 +331,7 @@ final class DownloadManager: ObservableObject {
             case .failed, .cancelled:
                 item.errorMessage = ""
                 item.autoDownload = true
+                item.automaticRetryCount = 0
                 item.state = item.metadataLoaded ? .waiting : .queued
             default:
                 break
@@ -363,6 +365,7 @@ final class DownloadManager: ObservableObject {
         case .failed, .cancelled:
             item.errorMessage = ""
             item.autoDownload = true
+            item.automaticRetryCount = 0
             item.state = item.metadataLoaded ? .waiting : .queued
             objectWillChange.send()
             processNext()
@@ -504,6 +507,17 @@ final class DownloadManager: ObservableObject {
 
         var arguments = [
             "--ignore-config", "--no-cache-dir", "--newline", "--no-colors", "--no-playlist",
+            "--continue",
+            "--no-overwrites",
+            "--force-ipv4",
+            "--retries", "10",
+            "--fragment-retries", "10",
+            "--file-access-retries", "5",
+            "--retry-sleep", "exp=1:10",
+            "--socket-timeout", "30",
+            "--concurrent-fragments", "4",
+            "--http-chunk-size", "10M",
+            "--merge-output-format", "mp4",
             "--trim-filenames", "180",
             "--paths", outputFolder.path,
             "--output", "%(title)s [%(id)s].%(ext)s",
@@ -665,6 +679,7 @@ final class DownloadManager: ObservableObject {
             }
         case .download:
             if code == 0 {
+                item.automaticRetryCount = 0
                 item.state = .done
                 item.progress = 100
                 statusText = "下载完成"
@@ -674,7 +689,18 @@ final class DownloadManager: ObservableObject {
                 item.state = .cancelled
                 statusText = "已取消"
                 hintText = item.title
+            } else if item.automaticRetryCount < 2 {
+                item.automaticRetryCount += 1
+                item.state = .waiting
+                statusText = "下载中断，正在自动重试 \(item.automaticRetryCount)/2"
+                hintText = item.title
+                objectWillChange.send()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    self?.processNext()
+                }
+                return
             } else {
+                item.automaticRetryCount = 0
                 item.state = .failed
                 item.errorMessage = friendlyError(from: processDiagnostic)
                 statusText = "下载失败"
