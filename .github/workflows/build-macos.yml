@@ -80,7 +80,7 @@ jobs:
         run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
 
       - name: Download architecture artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: Downloader-${{ steps.meta.outputs.version }}-arm64
           path: release-assets
